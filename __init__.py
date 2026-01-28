@@ -50,25 +50,66 @@ def has_claude_conversation(working_dir=None):
     return len(conversation_files) > 0
 
 
+def find_executable(name):
+    """Find an executable, checking common paths if not in PATH."""
+    import shutil
+
+    # First try the standard PATH
+    path = shutil.which(name)
+    if path:
+        return path
+
+    # Common locations for npm/node/claude on different systems
+    common_paths = [
+        # macOS Homebrew
+        f"/opt/homebrew/bin/{name}",
+        f"/usr/local/bin/{name}",
+        # Linux common paths
+        f"/usr/bin/{name}",
+        f"/usr/local/bin/{name}",
+        # nvm default location
+        os.path.expanduser(f"~/.nvm/versions/node/*/bin/{name}"),
+        # npm global installs
+        os.path.expanduser(f"~/.npm-global/bin/{name}"),
+        os.path.expanduser(f"~/node_modules/.bin/{name}"),
+        # n (node version manager)
+        f"/usr/local/n/versions/node/*/bin/{name}",
+        # Conda
+        os.path.expanduser(f"~/anaconda3/bin/{name}"),
+        os.path.expanduser(f"~/miniconda3/bin/{name}"),
+        f"/opt/conda/bin/{name}",
+    ]
+
+    import glob
+    for pattern in common_paths:
+        matches = glob.glob(pattern)
+        if matches:
+            # Return the first match (or latest version for nvm-style paths)
+            matches.sort(reverse=True)
+            if os.path.isfile(matches[0]) and os.access(matches[0], os.X_OK):
+                return matches[0]
+
+    return None
+
+
 def is_claude_installed():
     """Check if claude CLI is installed."""
-    import shutil
-    return shutil.which("claude") is not None
+    return find_executable("claude") is not None
 
 
 def install_claude_code():
     """Attempt to install Claude Code CLI. Returns (success, message)."""
     import subprocess
-    import shutil
 
     # Check if npm is available
-    if shutil.which("npm") is None:
+    npm_path = find_executable("npm")
+    if npm_path is None:
         return False, "npm not found. Please install Node.js first: https://nodejs.org/"
 
     try:
-        print("[Claude Code] Installing Claude Code CLI...")
+        print(f"[Claude Code] Installing Claude Code CLI using {npm_path}...")
         result = subprocess.run(
-            ["npm", "install", "-g", "@anthropic-ai/claude-code"],
+            [npm_path, "install", "-g", "@anthropic-ai/claude-code"],
             capture_output=True,
             text=True,
             timeout=120
