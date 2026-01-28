@@ -580,16 +580,25 @@ def setup_mcp_config():
     """Set up MCP server configuration for Claude Code using claude mcp add."""
     import os
     import subprocess
-    from pathlib import Path
+    import shutil
 
     # Get the directory where this plugin is installed
     plugin_dir = os.path.dirname(os.path.abspath(__file__))
     mcp_server_path = os.path.join(plugin_dir, "mcp_server.py")
 
+    # Find the Python executable - use the same one running this code
+    python_path = sys.executable
+
+    # Check if claude is available
+    claude_path = shutil.which("claude")
+    if not claude_path:
+        print("[Claude Code] 'claude' command not found - MCP server not configured")
+        return
+
     # Check if MCP server is already configured
     try:
         result = subprocess.run(
-            ["claude", "mcp", "get", "comfyui"],
+            [claude_path, "mcp", "get", "comfyui"],
             capture_output=True,
             text=True,
             timeout=10
@@ -601,15 +610,16 @@ def setup_mcp_config():
         pass
 
     # Add MCP server using claude mcp add
+    # Use full paths for both python and mcp_server.py
     try:
         result = subprocess.run(
-            ["claude", "mcp", "add", "comfyui", "--", "python3", mcp_server_path],
+            [claude_path, "mcp", "add", "comfyui", python_path, mcp_server_path],
             capture_output=True,
             text=True,
             timeout=30
         )
         if result.returncode == 0:
-            print(f"[Claude Code] MCP server added successfully")
+            print(f"[Claude Code] MCP server added: {python_path} {mcp_server_path}")
         else:
             print(f"[Claude Code] Failed to add MCP server: {result.stderr}")
     except subprocess.TimeoutExpired:
