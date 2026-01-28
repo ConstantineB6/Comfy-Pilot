@@ -11,4 +11,4 @@ Repository = "https://github.com/ConstantineB6/comfy-pilot"
 [tool.comfy]
 PublisherId = "constantine"
 DisplayName = "Comfy Pilot"
-# Icon = ""  # Optional: URL to icon (SVG, PNG, JPG, GIF - max 800x400px)
+Icon = "https://raw.githubusercontent.com/ConstantineB6/comfy-pilot/main/thumbnail.png"
