@@ -1,0 +1,14 @@
+[project]
+name = "comfy-pilot"
+description = "MCP server + embedded terminal that lets Claude Code see and edit your ComfyUI workflows"
+version = "1.0.0"
+license = { file = "LICENSE" }
+dependencies = []
+
+[project.urls]
+Repository = "https://github.com/ConstantineB6/comfy-pilot"
+
+[tool.comfy]
+PublisherId = "constantine"
+DisplayName = "Comfy Pilot"
+# Icon = ""  # Optional: URL to icon (SVG, PNG, JPG, GIF - max 800x400px)

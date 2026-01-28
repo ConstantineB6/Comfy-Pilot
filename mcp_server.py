@@ -317,12 +317,14 @@ def clear_history() -> dict:
 
 # ============== CONSOLIDATED TOOLS ==============
 
-def get_status(include: list = None) -> dict:
+def get_status(include: list = None, detail: str = "summary") -> dict:
     """Get status information from ComfyUI.
 
     Args:
         include: List of what to include: "queue", "system", "history".
                  Default is ["queue", "system"].
+        detail: Level of detail - "summary" (default) or "full".
+                Summary returns counts and IDs only. Full returns raw API data.
     """
     if include is None:
         include = ["queue", "system"]
@@ -330,13 +332,49 @@ def get_status(include: list = None) -> dict:
     result = {}
 
     if "queue" in include:
-        result["queue"] = make_request("/queue")
+        raw_queue = make_request("/queue")
+        if "error" in raw_queue:
+            result["queue"] = raw_queue
+        elif detail == "full":
+            result["queue"] = raw_queue
+        else:
+            # Summarize queue - just counts and prompt IDs
+            running = raw_queue.get("queue_running", [])
+            pending = raw_queue.get("queue_pending", [])
+            result["queue"] = {
+                "running": len(running),
+                "pending": len(pending),
+                "running_prompts": [item[1] if len(item) > 1 else None for item in running],
+                "pending_prompts": [item[1] if len(item) > 1 else None for item in pending]
+            }
 
     if "system" in include:
         result["system"] = make_request("/system_stats")
 
     if "history" in include:
-        result["history"] = make_request("/history")
+        raw_history = make_request("/history")
+        if "error" in raw_history:
+            result["history"] = raw_history
+        elif detail == "full":
+            result["history"] = raw_history
+        else:
+            # Summarize history - list of prompt IDs with status and output node IDs
+            history_summary = []
+            for prompt_id, data in raw_history.items():
+                if not isinstance(data, dict):
+                    continue
+                outputs = data.get("outputs", {})
+                status = data.get("status", {})
+                history_summary.append({
+                    "prompt_id": prompt_id,
+                    "status": status.get("status_str", "unknown"),
+                    "completed": status.get("completed", False),
+                    "output_nodes": list(outputs.keys()) if outputs else []
+                })
+            result["history"] = {
+                "total": len(history_summary),
+                "prompts": history_summary[-10:]  # Last 10 only
+            }
 
     return result
 
@@ -1247,7 +1285,7 @@ def handle_request(request: dict) -> dict:
                     },
                     {
                         "name": "get_status",
-                        "description": "Get ComfyUI status: queue, system stats, and/or history.",
+                        "description": "Get ComfyUI status: queue, system stats, and/or history. Returns lightweight summaries by default (counts, IDs). Use detail='full' for raw API data.",
                         "inputSchema": {
                             "type": "object",
                             "properties": {
@@ -1255,6 +1293,11 @@ def handle_request(request: dict) -> dict:
                                     "type": "array",
                                     "items": {"type": "string", "enum": ["queue", "system", "history"]},
                                     "description": "What to include. Default: [\"queue\", \"system\"]"
+                                },
+                                "detail": {
+                                    "type": "string",
+                                    "enum": ["summary", "full"],
+                                    "description": "\"summary\" (default): counts and IDs only. \"full\": raw API data (can be large)."
                                 }
                             },
                             "required": []
@@ -1342,7 +1385,10 @@ def handle_request(request: dict) -> dict:
             elif tool_name == "get_node_info":
                 result = get_node_info(tool_args.get("node_id", ""))
             elif tool_name == "get_status":
-                result = get_status(tool_args.get("include"))
+                result = get_status(
+                    include=tool_args.get("include"),
+                    detail=tool_args.get("detail", "summary")
+                )
             elif tool_name == "run":
                 result = run(
                     action=tool_args.get("action", "queue"),
