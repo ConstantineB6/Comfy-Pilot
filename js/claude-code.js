@@ -554,6 +554,19 @@ function initTerminal(terminalContainer) {
         }
     });
 
+    // Handle Shift+Enter to insert a newline instead of submitting
+    terminal.attachCustomKeyEventHandler((event) => {
+        // Shift+Enter: insert a literal newline (for multi-line input in Claude)
+        if (event.type === "keydown" && event.key === "Enter" && event.shiftKey) {
+            if (websocket && websocket.readyState === WebSocket.OPEN) {
+                // Send newline character - Claude Code should interpret this as a line break
+                websocket.send(JSON.stringify({ type: "i", d: "\n" }));
+            }
+            return false; // Prevent default Enter handling
+        }
+        return true; // Allow all other keys
+    });
+
     // Handle terminal resize
     terminal.onResize(({ rows, cols }) => {
         if (websocket && websocket.readyState === WebSocket.OPEN) {
