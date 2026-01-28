@@ -448,24 +448,17 @@ async def websocket_handler(request):
         command = get_claude_command()
         print(f"[Claude Code] Auto-detected command: {command}")
 
-    # Check if claude is installed, auto-install if needed
-    if not is_claude_installed():
-        print("[Claude Code] Claude CLI not found, attempting auto-install...")
-        await ws.send_str("o\x1b[33mClaude Code CLI not found. Attempting to install...\x1b[0m\r\n")
+    # Note: We don't pre-check for claude here because the Python process
+    # may have a different PATH than the user's shell. The PTY will spawn
+    # with the user's shell environment which should have the correct PATH.
+    # If claude is not found, the user will see the error in the terminal.
 
-        # Run installation in a thread to not block
-        loop = asyncio.get_event_loop()
-        success, message = await loop.run_in_executor(None, install_claude_code)
-
-        if success:
-            await ws.send_str("o\x1b[32m" + message + "\x1b[0m\r\n\r\n")
-        else:
-            await ws.send_str("o\x1b[31m" + message + "\x1b[0m\r\n")
-            await ws.send_str("o\r\nTo install manually, run:\r\n")
-            await ws.send_str("o\x1b[36m  npm install -g @anthropic-ai/claude-code\x1b[0m\r\n")
-            await ws.close()
-            del terminal_sessions[session_id]
-            return ws
+    # Try to set up MCP if not already configured (may have been skipped at load time
+    # if claude wasn't installed yet)
+    try:
+        setup_mcp_config()
+    except Exception as e:
+        print(f"[Claude Code] MCP setup error (non-fatal): {e}")
 
     async def read_pty():
         """Read from PTY and send to WebSocket."""
@@ -630,10 +623,10 @@ def setup_mcp_config():
     # Find the Python executable - use the same one running this code
     python_path = sys.executable
 
-    # Check if claude is available
-    claude_path = shutil.which("claude")
+    # Check if claude is available (use find_executable to check common paths)
+    claude_path = find_executable("claude")
     if not claude_path:
-        print("[Claude Code] 'claude' command not found - MCP server not configured")
+        print("[Claude Code] 'claude' command not found - MCP server not configured (will retry when terminal opens)")
         return
 
     # Check if MCP server is already configured
