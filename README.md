@@ -66,6 +66,10 @@ The MCP server provides these tools to Claude Code:
 | `run` | Run workflow (optionally up to a specific node) or interrupt |
 | `edit_graph` | Batch create, delete, move, connect, and configure nodes |
 | `view_image` | View images from Preview Image / Save Image nodes |
+| `search_custom_nodes` | Search ComfyUI Manager registry for custom nodes |
+| `install_custom_node` | Install a custom node from the registry |
+| `uninstall_custom_node` | Uninstall a custom node |
+| `update_custom_node` | Update a custom node to latest version |
 
 ### Example: Creating Nodes
 

@@ -1189,6 +1189,230 @@ def view_image(node_id: str = None, image_index: int = 0) -> dict:
         return {"error": f"Failed to fetch image: {str(e)}"}
 
 
+# ============== NODE MANAGEMENT (via ComfyUI Manager API) ==============
+
+def search_custom_nodes(query: str = None, status: str = "all", category: str = None, limit: int = 10) -> dict:
+    """Search for custom nodes in the ComfyUI Manager registry.
+
+    Args:
+        query: Search term (matches name, description, author). Case-insensitive substring match.
+        status: Filter by status - "all", "installed", "not-installed", "has-update"
+        category: Filter by category (e.g., "animation", "3d", "video")
+        limit: Maximum results to return (default 10)
+
+    Returns:
+        List of matching nodes with basic info.
+    """
+    # Get the full node list from ComfyUI Manager
+    node_list = make_request("/customnode/getlist?mode=cache")
+    if "error" in node_list:
+        # Try without cache
+        node_list = make_request("/customnode/getlist")
+    if "error" in node_list:
+        return {"error": f"ComfyUI Manager not available: {node_list.get('error')}. Make sure ComfyUI Manager is installed."}
+
+    # node_list is {"custom_nodes": [...]}
+    nodes = node_list.get("custom_nodes", [])
+    if not nodes:
+        return {"error": "No custom nodes found. ComfyUI Manager may not be properly installed."}
+
+    # Get installed nodes for status filtering
+    installed_data = make_request("/customnode/installed?mode=cache")
+    if "error" in installed_data:
+        installed_data = make_request("/customnode/installed")
+
+    installed_map = {}
+    if "error" not in installed_data:
+        for node in installed_data.get("custom_nodes", []):
+            node_id = node.get("id") or node.get("title", "").lower().replace(" ", "-")
+            installed_map[node_id] = {
+                "installed": node.get("installed", False),
+                "version": node.get("version"),
+                "has_update": node.get("update_available", False) or node.get("need_update", False)
+            }
+
+    # Filter and search
+    results = []
+    query_lower = query.lower() if query else None
+
+    for node in nodes:
+        # Extract node info
+        node_id = node.get("id") or node.get("reference", "")
+        title = node.get("title", "")
+        description = node.get("description", "")
+        author = node.get("author", "")
+        node_category = node.get("category", "")
+
+        # Status filter
+        install_info = installed_map.get(node_id, {})
+        is_installed = install_info.get("installed", False) or node.get("installed", False)
+        has_update = install_info.get("has_update", False)
+
+        if status == "installed" and not is_installed:
+            continue
+        elif status == "not-installed" and is_installed:
+            continue
+        elif status == "has-update" and not has_update:
+            continue
+
+        # Category filter
+        if category and category.lower() not in node_category.lower():
+            continue
+
+        # Query filter (substring match on title, description, author)
+        if query_lower:
+            searchable = f"{title} {description} {author}".lower()
+            if query_lower not in searchable:
+                continue
+
+        # Build result
+        results.append({
+            "id": node_id,
+            "title": title,
+            "author": author,
+            "description": description[:150] + "..." if len(description) > 150 else description,
+            "category": node_category,
+            "installed": is_installed,
+            "has_update": has_update,
+            "stars": node.get("stars", 0),
+        })
+
+        if len(results) >= limit:
+            break
+
+    return {
+        "total_matches": len(results),
+        "limit": limit,
+        "query": query,
+        "status_filter": status,
+        "nodes": results
+    }
+
+
+def install_custom_node(node_id: str) -> dict:
+    """Install a custom node via ComfyUI Manager.
+
+    Args:
+        node_id: The node ID or reference to install (e.g., "comfy-pilot", or git URL)
+
+    Returns:
+        Installation status.
+    """
+    # Check if it's a git URL
+    if node_id.startswith("http://") or node_id.startswith("https://"):
+        result = make_request("/customnode/install/git_url", method="POST", data=node_id)
+        if "error" in result:
+            return result
+        return {"status": "queued", "node_id": node_id, "message": "Installation queued from git URL"}
+
+    # Find the node in the registry first
+    node_list = make_request("/customnode/getlist?mode=cache")
+    if "error" in node_list:
+        node_list = make_request("/customnode/getlist")
+    if "error" in node_list:
+        return {"error": f"ComfyUI Manager not available: {node_list.get('error')}"}
+
+    # Find matching node
+    target_node = None
+    for node in node_list.get("custom_nodes", []):
+        nid = node.get("id") or node.get("reference", "")
+        title = node.get("title", "")
+        if node_id.lower() in nid.lower() or node_id.lower() in title.lower():
+            target_node = node
+            break
+
+    if not target_node:
+        return {"error": f"Node '{node_id}' not found in registry. Use search_custom_nodes to find available nodes."}
+
+    # Queue installation via Manager API
+    result = make_request("/manager/queue/install", method="POST", data=target_node)
+    if "error" in result:
+        return result
+
+    return {
+        "status": "queued",
+        "node_id": target_node.get("id") or target_node.get("reference"),
+        "title": target_node.get("title"),
+        "message": "Installation queued. Restart ComfyUI to complete installation."
+    }
+
+
+def uninstall_custom_node(node_id: str) -> dict:
+    """Uninstall a custom node via ComfyUI Manager.
+
+    Args:
+        node_id: The node ID to uninstall
+
+    Returns:
+        Uninstallation status.
+    """
+    # Get installed nodes to find the target
+    installed_data = make_request("/customnode/installed")
+    if "error" in installed_data:
+        return {"error": f"ComfyUI Manager not available: {installed_data.get('error')}"}
+
+    # Find matching installed node
+    target_node = None
+    for node in installed_data.get("custom_nodes", []):
+        nid = node.get("id") or node.get("title", "").lower().replace(" ", "-")
+        title = node.get("title", "")
+        if node_id.lower() in nid.lower() or node_id.lower() in title.lower():
+            target_node = node
+            break
+
+    if not target_node:
+        return {"error": f"Node '{node_id}' is not installed. Use search_custom_nodes(status='installed') to see installed nodes."}
+
+    # Queue uninstallation
+    result = make_request("/manager/queue/uninstall", method="POST", data=target_node)
+    if "error" in result:
+        return result
+
+    return {
+        "status": "queued",
+        "node_id": target_node.get("id") or target_node.get("title"),
+        "message": "Uninstallation queued. Restart ComfyUI to complete."
+    }
+
+
+def update_custom_node(node_id: str) -> dict:
+    """Update a custom node via ComfyUI Manager.
+
+    Args:
+        node_id: The node ID to update
+
+    Returns:
+        Update status.
+    """
+    # Get installed nodes to find the target
+    installed_data = make_request("/customnode/installed")
+    if "error" in installed_data:
+        return {"error": f"ComfyUI Manager not available: {installed_data.get('error')}"}
+
+    # Find matching installed node
+    target_node = None
+    for node in installed_data.get("custom_nodes", []):
+        nid = node.get("id") or node.get("title", "").lower().replace(" ", "-")
+        title = node.get("title", "")
+        if node_id.lower() in nid.lower() or node_id.lower() in title.lower():
+            target_node = node
+            break
+
+    if not target_node:
+        return {"error": f"Node '{node_id}' is not installed. Install it first with install_custom_node."}
+
+    # Queue update
+    result = make_request("/manager/queue/update", method="POST", data=target_node)
+    if "error" in result:
+        return result
+
+    return {
+        "status": "queued",
+        "node_id": target_node.get("id") or target_node.get("title"),
+        "message": "Update queued. Restart ComfyUI to complete."
+    }
+
+
 # MCP Protocol Implementation
 def send_response(response: dict):
     """Send a JSON-RPC response."""
@@ -1359,6 +1583,75 @@ def handle_request(request: dict) -> dict:
                             },
                             "required": []
                         }
+                    },
+                    {
+                        "name": "search_custom_nodes",
+                        "description": "Search for custom nodes in the ComfyUI Manager registry. Returns name, author, description, install status, and star count.",
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {
+                                "query": {
+                                    "type": "string",
+                                    "description": "Search term (matches name, description, author). Case-insensitive."
+                                },
+                                "status": {
+                                    "type": "string",
+                                    "enum": ["all", "installed", "not-installed", "has-update"],
+                                    "description": "Filter by installation status. Default: all"
+                                },
+                                "category": {
+                                    "type": "string",
+                                    "description": "Filter by category (e.g., 'animation', '3d', 'video')"
+                                },
+                                "limit": {
+                                    "type": "integer",
+                                    "description": "Maximum results to return. Default: 10"
+                                }
+                            },
+                            "required": []
+                        }
+                    },
+                    {
+                        "name": "install_custom_node",
+                        "description": "Install a custom node via ComfyUI Manager. Requires restart to complete.",
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {
+                                "node_id": {
+                                    "type": "string",
+                                    "description": "Node ID, name, or git URL to install"
+                                }
+                            },
+                            "required": ["node_id"]
+                        }
+                    },
+                    {
+                        "name": "uninstall_custom_node",
+                        "description": "Uninstall a custom node via ComfyUI Manager. Requires restart to complete.",
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {
+                                "node_id": {
+                                    "type": "string",
+                                    "description": "Node ID or name to uninstall"
+                                }
+                            },
+                            "required": ["node_id"]
+                        }
+                    },
+                    {
+                        "name": "update_custom_node",
+                        "description": "Update a custom node to the latest version via ComfyUI Manager. Requires restart to complete.",
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {
+                                "node_id": {
+                                    "type": "string",
+                                    "description": "Node ID or name to update"
+                                }
+                            },
+                            "required": ["node_id"]
+                        }
                     }
                 ]
             }
@@ -1425,6 +1718,22 @@ def handle_request(request: dict) -> dict:
                 result = disconnect_nodes(tool_args.get("disconnections", {}))
             elif tool_name == "move_nodes":
                 result = move_nodes(tool_args.get("moves", {}))
+
+            # Node management tools
+            elif tool_name == "search_custom_nodes":
+                result = search_custom_nodes(
+                    query=tool_args.get("query"),
+                    status=tool_args.get("status", "all"),
+                    category=tool_args.get("category"),
+                    limit=tool_args.get("limit", 10)
+                )
+            elif tool_name == "install_custom_node":
+                result = install_custom_node(tool_args.get("node_id", ""))
+            elif tool_name == "uninstall_custom_node":
+                result = uninstall_custom_node(tool_args.get("node_id", ""))
+            elif tool_name == "update_custom_node":
+                result = update_custom_node(tool_args.get("node_id", ""))
+
             else:
                 return {
                     "jsonrpc": "2.0",
