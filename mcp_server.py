@@ -521,6 +521,7 @@ def edit_graph(operations) -> str:
 
     results = []
     created_nodes = {}  # Map temp refs to real node IDs
+    viewport_offset = 0  # Horizontal offset for place_in_view nodes
 
     for i, op in enumerate(operations):
         action = op.get("action", "")
@@ -534,11 +535,14 @@ def edit_graph(operations) -> str:
                 elif node_type not in all_nodes:
                     result["error"] = f"Unknown node type: {node_type}"
                 else:
+                    place_in_view = op.get("place_in_view", False)
                     r = send_graph_command("create_node", {
                         "type": node_type,
                         "pos_x": op.get("pos_x", 100),
                         "pos_y": op.get("pos_y", 100),
-                        "title": op.get("title")
+                        "title": op.get("title"),
+                        "place_in_view": place_in_view,
+                        "viewport_offset": viewport_offset if place_in_view else 0
                     })
                     result.update(r)
                     # Store created node ID for reference
@@ -546,6 +550,11 @@ def edit_graph(operations) -> str:
                         ref = op.get("ref")
                         if ref:
                             created_nodes[ref] = r["node_id"]
+                        # Increment viewport offset for next place_in_view node
+                        if place_in_view:
+                            # Use node size + gap for offset (default 300 + 30 if size unknown)
+                            node_width = r.get("size", [300, 100])[0] if isinstance(r.get("size"), list) else 300
+                            viewport_offset += node_width + 30
 
             elif action == "delete":
                 node_ids = op.get("node_ids") or [op.get("node_id")]
@@ -770,6 +779,23 @@ def edit_graph(operations) -> str:
                 lines.extend(collisions)
 
     return "\n".join(lines)
+
+
+def center_on_node(node_id: str) -> str:
+    """Center the user's view on a specific node.
+
+    Args:
+        node_id: The ID of the node to center on.
+
+    Returns:
+        Status message in TOON format.
+    """
+    result = send_graph_command("center_on_node", {"node_id": str(node_id)})
+
+    if "error" in result:
+        return f"error: {result['error']}"
+
+    return f"ok: centered on node {node_id}"
 
 
 def run_node(node_ids) -> dict:
@@ -2534,7 +2560,7 @@ def handle_request(request: dict) -> dict:
                                         {"type": "object"},
                                         {"type": "array", "items": {"type": "object"}}
                                     ],
-                                    "description": "Operation(s). Each has 'action' + params. Actions: create {node_type, pos_x, pos_y, title, ref}, delete {node_id or node_ids}, move {node_id, x, y} or {node_id, relative_to, direction, gap}, resize {node_id, width, height}, set {node_id, property, value} or {node_id, properties: {k:v}}, connect/disconnect {from_node, from_slot, to_node, to_slot}. Use 'ref' in create to reference node in later ops."
+                                    "description": "Operation(s). Each has 'action' + params. Actions: create {node_type, pos_x, pos_y, title, ref, place_in_view}, delete {node_id or node_ids}, move {node_id, x, y} or {node_id, relative_to, direction, gap}, resize {node_id, width, height}, set {node_id, property, value} or {node_id, properties: {k:v}}, connect/disconnect {from_node, from_slot, to_node, to_slot}. Use 'ref' in create to reference node in later ops. Use 'place_in_view: true' to position new nodes at the center of the user's current viewport (nodes are offset horizontally to avoid overlap)."
                                 }
                             },
                             "required": ["operations"]
@@ -2556,6 +2582,20 @@ def handle_request(request: dict) -> dict:
                                 }
                             },
                             "required": []
+                        }
+                    },
+                    {
+                        "name": "center_on_node",
+                        "description": "Center the user's viewport on a specific node. Useful after creating nodes to show the user where they were placed.",
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {
+                                "node_id": {
+                                    "type": "string",
+                                    "description": "ID of the node to center the view on."
+                                }
+                            },
+                            "required": ["node_id"]
                         }
                     },
                     {
@@ -2701,6 +2741,8 @@ def handle_request(request: dict) -> dict:
                     node_id=tool_args.get("node_id"),
                     image_index=tool_args.get("image_index", 0)
                 )
+            elif tool_name == "center_on_node":
+                result = center_on_node(tool_args.get("node_id", ""))
 
             # Legacy tools (keep for backwards compatibility)
             elif tool_name == "get_queue":

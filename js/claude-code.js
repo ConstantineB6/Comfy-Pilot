@@ -1103,12 +1103,107 @@ async function executeGraphCommand(command) {
                 }
             }
 
+            case "center_on_node": {
+                const nodeId = parseInt(params.node_id);
+                const node = app.graph.getNodeById(nodeId);
+                if (!node) {
+                    return { error: `Node ${params.node_id} not found` };
+                }
+                if (app.canvas && app.canvas.centerOnNode) {
+                    app.canvas.centerOnNode(node);
+                    return { status: "centered", node_id: params.node_id };
+                } else {
+                    return { error: "Canvas centerOnNode not available" };
+                }
+            }
+
             case "create_node": {
                 const node = LiteGraph.createNode(params.type);
                 if (!node) {
                     return { error: `Failed to create node of type: ${params.type}` };
                 }
-                node.pos = [params.pos_x || 100, params.pos_y || 100];
+
+                const nodeWidth = node.size ? node.size[0] : 200;
+                const nodeHeight = node.size ? node.size[1] : 100;
+                const gap = 30;
+
+                // Helper to check if position collides with any existing node
+                const checkCollision = (x, y, w, h) => {
+                    for (const other of app.graph._nodes) {
+                        if (other === node) continue;
+                        const ox = other.pos[0], oy = other.pos[1];
+                        const ow = other.size ? other.size[0] : 200;
+                        const oh = other.size ? other.size[1] : 100;
+                        // Check rectangle overlap
+                        if (x < ox + ow && x + w > ox && y < oy + oh && y + h > oy) {
+                            return other; // Return colliding node
+                        }
+                    }
+                    return null;
+                };
+
+                // Helper to find free position near target
+                const findFreePosition = (startX, startY) => {
+                    let x = startX, y = startY;
+                    const collider = checkCollision(x, y, nodeWidth, nodeHeight);
+                    if (!collider) return [x, y];
+
+                    // Try directions: right, below, left, above (expanding outward)
+                    const directions = [
+                        [1, 0],  // right
+                        [0, 1],  // below
+                        [-1, 0], // left
+                        [0, -1]  // above
+                    ];
+
+                    for (let distance = 1; distance <= 10; distance++) {
+                        for (const [dx, dy] of directions) {
+                            const tryX = startX + dx * (nodeWidth + gap) * distance;
+                            const tryY = startY + dy * (nodeHeight + gap) * distance;
+                            if (!checkCollision(tryX, tryY, nodeWidth, nodeHeight)) {
+                                return [tryX, tryY];
+                            }
+                        }
+                    }
+                    // Fallback: just offset right
+                    return [startX + nodeWidth + gap, startY];
+                };
+
+                // Handle place_in_view - position at viewport center
+                if (params.place_in_view && app.canvas) {
+                    const canvas = app.canvas;
+                    const offset = canvas.ds.offset;
+                    const scale = canvas.ds.scale;
+
+                    // Account for sidebars/UI - the actual graph area is smaller than canvas
+                    // Left sidebar is roughly 130px, we'll shift the center left
+                    const sidebarOffset = 130;
+                    const screenCenterX = (canvas.canvas.width - sidebarOffset) / 2;
+                    const screenCenterY = canvas.canvas.height / 2;
+
+                    // Calculate visible area in graph coordinates
+                    // Formula: graphPos = (screenPos - offset) / scale
+                    const centerX = (screenCenterX - offset[0]) / scale;
+                    const centerY = (screenCenterY - offset[1]) / scale;
+
+                    console.log("[place_in_view] offset:", offset, "scale:", scale);
+                    console.log("[place_in_view] adjusted screen center:", screenCenterX, screenCenterY);
+                    console.log("[place_in_view] graph center:", centerX, centerY);
+
+                    // Center the node (not top-left corner)
+                    const targetX = centerX - nodeWidth / 2;
+                    const targetY = centerY - nodeHeight / 2;
+
+                    // Find free position (auto-avoid collisions)
+                    node.pos = findFreePosition(targetX, targetY);
+                    console.log("[place_in_view] final node pos:", node.pos);
+                } else {
+                    // Explicit position - also check for collisions
+                    const targetX = params.pos_x || 100;
+                    const targetY = params.pos_y || 100;
+                    node.pos = findFreePosition(targetX, targetY);
+                }
+
                 if (params.title) {
                     node.title = params.title;
                 }

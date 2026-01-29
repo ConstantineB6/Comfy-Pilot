@@ -35,6 +35,29 @@ Position nodes logically from left to right following the data flow:
 **Special case: Load 3D & Animation nodes**
 These nodes expand after creation to show a 3D preview. The preview adds ~180px in height. When placing nodes below a Load 3D & Animation node, add at least 200px of extra vertical spacing to avoid overlap.
 
+### Placing New Node Groups in View
+
+When creating nodes that are **not connected to existing workflow** (new starting points, separate node groups, or standalone utilities), use `place_in_view: true`:
+
+```
+edit_graph(operations=[
+  {action: "create", node_type: "CheckpointLoaderSimple", title: "Load Model", place_in_view: true, ref: "loader"},
+  {action: "create", node_type: "KSampler", title: "Sampler", place_in_view: true, ref: "sampler"},
+  {action: "connect", from_node: "loader", from_slot: 0, to_node: "sampler", to_slot: 0}
+])
+```
+
+This places nodes at the **center of the user's current viewport**, so they appear where the user is looking. Multiple nodes with `place_in_view` in the same batch are automatically offset horizontally to avoid overlap.
+
+**When to use `place_in_view`:**
+- Creating a new workflow from scratch
+- Adding a separate/parallel branch not connected to existing nodes
+- Creating utility nodes the user wants to see immediately
+
+**When NOT to use `place_in_view`:**
+- Adding nodes that connect to existing workflow (use relative positioning or explicit coordinates based on existing node positions)
+- Moving or modifying existing nodes
+
 ### Batch Operations with edit_graph
 
 **Use `edit_graph` for all graph modifications** - it batches multiple operations in a single tool call:
