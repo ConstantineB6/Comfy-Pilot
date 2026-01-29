@@ -1,7 +1,7 @@
 [project]
 name = "comfy-pilot"
 description = "MCP server + embedded terminal that lets Claude Code see and edit your ComfyUI workflows"
-version = "1.0.13"
+version = "1.0.14"
 license = { file = "LICENSE" }
 dependencies = []
 

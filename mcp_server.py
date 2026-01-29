@@ -169,8 +169,10 @@ def get_workflow() -> dict:
     return {"message": "No workflow found"}
 
 
-def get_node_types(search = None, category: str = None, fields: list = None) -> dict:
+def get_node_types(search = None, category: str = None, fields: list = None) -> str:
     """Get available node types in ComfyUI, optionally filtered.
+
+    Returns compact TOON-like format.
 
     Args:
         search: Search term(s) - string or list of strings
@@ -181,39 +183,57 @@ def get_node_types(search = None, category: str = None, fields: list = None) -> 
     all_nodes = get_object_info_cached()
 
     if "error" in all_nodes:
-        return all_nodes
+        return f"error: {all_nodes.get('error')}"
 
-    # Helper to create minimal node info
-    def minimal_node_info(node_name: str, node_info: dict) -> dict:
-        result = {
-            "display_name": node_info.get("display_name") or node_name,
-            "category": node_info.get("category", "uncategorized")
-        }
+    fields = fields or []
 
-        # Add requested fields
-        if fields:
-            if "description" in fields:
-                result["description"] = node_info.get("description") or ""
-            if "inputs" in fields:
-                result["inputs"] = node_info.get("input", {})
-            if "outputs" in fields:
-                result["outputs"] = node_info.get("output", [])
-            if "input_types" in fields:
-                # Just the type names for inputs
-                input_info = node_info.get("input", {})
-                input_types = {}
-                for group in ["required", "optional"]:
-                    if group in input_info:
-                        for inp_name, inp_def in input_info[group].items():
-                            if isinstance(inp_def, list) and len(inp_def) > 0:
-                                input_types[inp_name] = inp_def[0] if isinstance(inp_def[0], str) else type(inp_def[0]).__name__
-                result["input_types"] = input_types
-            if "output_types" in fields:
-                result["output_types"] = node_info.get("output", [])
+    # Helper to format a single node in TOON
+    def format_node(node_name: str, node_info: dict) -> list:
+        """Return lines for a single node."""
+        lines = []
+        display_name = node_info.get("display_name") or node_name
+        cat = node_info.get("category", "uncategorized")
 
-        return result
+        # Escape commas
+        display_name = display_name.replace(",", ";")
+        cat = cat.replace(",", ";")
 
-    # If no filters, return just a summary list of node names grouped by category
+        header = f"  {node_name},{display_name},{cat}"
+
+        if "description" in fields:
+            desc = (node_info.get("description") or "").replace("\n", " ").replace(",", ";")[:100]
+            header += f",{desc}"
+
+        lines.append(header)
+
+        # Input types (compact)
+        if "input_types" in fields or "inputs" in fields:
+            input_info = node_info.get("input", {})
+            inputs = []
+            for group in ["required", "optional"]:
+                if group in input_info:
+                    req_marker = "*" if group == "required" else ""
+                    for inp_name, inp_def in input_info[group].items():
+                        if isinstance(inp_def, list) and len(inp_def) > 0:
+                            inp_type = inp_def[0] if isinstance(inp_def[0], str) else type(inp_def[0]).__name__
+                            inputs.append(f"{inp_name}{req_marker}:{inp_type}")
+            if inputs:
+                lines.append(f"    in: {','.join(inputs)}")
+
+        # Output types (compact)
+        if "output_types" in fields or "outputs" in fields:
+            outputs = node_info.get("output", [])
+            output_names = node_info.get("output_name", outputs)
+            if outputs:
+                out_parts = []
+                for i, out_type in enumerate(outputs):
+                    out_name = output_names[i] if i < len(output_names) else out_type
+                    out_parts.append(f"{out_name}:{out_type}")
+                lines.append(f"    out: {','.join(out_parts)}")
+
+        return lines
+
+    # If no filters, return category summary
     if not search and not category:
         categories = {}
         for node_name, node_info in all_nodes.items():
@@ -222,70 +242,57 @@ def get_node_types(search = None, category: str = None, fields: list = None) -> 
                 categories[cat] = []
             categories[cat].append(node_name)
 
-        # Sort categories and nodes within them
-        sorted_categories = {}
+        lines = [f"total: {len(all_nodes)} nodes"]
+        lines.append(f"categories[{len(categories)}]{{name,count}}:")
         for cat in sorted(categories.keys()):
-            sorted_categories[cat] = sorted(categories[cat])
-
-        return {
-            "total_nodes": len(all_nodes),
-            "categories": sorted_categories,
-            "hint": "Use 'search' parameter to find specific nodes, or 'category' to list nodes in a category."
-        }
+            lines.append(f"  {cat},{len(categories[cat])}")
+        lines.append("hint: use 'search' or 'category' parameter to filter")
+        return "\n".join(lines)
 
     # Helper function to search for a single term
-    def search_nodes(term: str) -> dict:
+    def search_nodes(term: str) -> list:
         term_lower = term.lower()
-        filtered = {}
+        matches = []
         for node_name, node_info in all_nodes.items():
             display_name = node_info.get("display_name") or ""
             description = node_info.get("description") or ""
             if (term_lower in node_name.lower() or
                 term_lower in display_name.lower() or
                 term_lower in description.lower()):
-                filtered[node_name] = minimal_node_info(node_name, node_info)
-        return filtered
+                matches.append((node_name, node_info))
+        return matches
 
-    # Filter by search term(s) - supports single string or array of strings
+    # Filter by search term(s)
     if search:
-        # Normalize to list
         search_terms = search if isinstance(search, list) else [search]
+        lines = []
 
-        if len(search_terms) == 1:
-            # Single search - return flat result for backwards compatibility
-            filtered = search_nodes(search_terms[0])
-            return {
-                "search": search_terms[0],
-                "matches": len(filtered),
-                "nodes": filtered
-            }
-        else:
-            # Multiple searches - return grouped results
-            results = {}
-            for term in search_terms:
-                filtered = search_nodes(term)
-                results[term] = {
-                    "matches": len(filtered),
-                    "nodes": filtered
-                }
-            return {
-                "searches": results,
-                "total_searches": len(search_terms)
-            }
+        for term in search_terms:
+            matches = search_nodes(term)
+            lines.append(f"search \"{term}\": {len(matches)} matches")
+            if matches:
+                lines.append(f"nodes[{len(matches)}]{{name,display,category}}:")
+                for node_name, node_info in sorted(matches, key=lambda x: x[0]):
+                    lines.extend(format_node(node_name, node_info))
+
+        return "\n".join(lines)
 
     # Filter by category
     if category:
         category_lower = category.lower()
-        filtered = {}
+        matches = []
         for node_name, node_info in all_nodes.items():
             cat = node_info.get("category", "")
             if category_lower in cat.lower():
-                filtered[node_name] = minimal_node_info(node_name, node_info)
-        return {
-            "category": category,
-            "matches": len(filtered),
-            "nodes": filtered
-        }
+                matches.append((node_name, node_info))
+
+        lines = [f"category \"{category}\": {len(matches)} matches"]
+        if matches:
+            lines.append(f"nodes[{len(matches)}]{{name,display,category}}:")
+            for node_name, node_info in sorted(matches, key=lambda x: x[0]):
+                lines.extend(format_node(node_name, node_info))
+
+        return "\n".join(lines)
 
 
 def get_queue() -> dict:
@@ -317,8 +324,8 @@ def clear_history() -> dict:
 
 # ============== CONSOLIDATED TOOLS ==============
 
-def get_status(include: list = None, detail: str = "summary", history_limit: int = 5, history_offset: int = 0) -> dict:
-    """Get status information from ComfyUI.
+def get_status(include: list = None, detail: str = "summary", history_limit: int = 5, history_offset: int = 0) -> str:
+    """Get status information from ComfyUI in compact TOON-like format.
 
     Args:
         include: List of what to include: "queue", "system", "history".
@@ -334,101 +341,86 @@ def get_status(include: list = None, detail: str = "summary", history_limit: int
     # Clamp history_limit
     history_limit = max(1, min(history_limit, 20))
 
-    result = {}
+    lines = []
 
     if "queue" in include:
         raw_queue = make_request("/queue")
         if "error" in raw_queue:
-            result["queue"] = raw_queue
-        elif detail == "full":
-            result["queue"] = raw_queue
+            lines.append(f"queue: error - {raw_queue.get('error')}")
         else:
-            # Summarize queue - just counts and prompt IDs
             running = raw_queue.get("queue_running", [])
             pending = raw_queue.get("queue_pending", [])
-            result["queue"] = {
-                "running": len(running),
-                "pending": len(pending),
-                "running_prompts": [item[1] if len(item) > 1 else None for item in running],
-                "pending_prompts": [item[1] if len(item) > 1 else None for item in pending]
-            }
+            lines.append(f"queue: {len(running)} running, {len(pending)} pending")
+            if running:
+                prompt_ids = [item[1][:8] if len(item) > 1 and item[1] else "?" for item in running]
+                lines.append(f"  running: {','.join(prompt_ids)}")
+            if pending:
+                prompt_ids = [item[1][:8] if len(item) > 1 and item[1] else "?" for item in pending]
+                lines.append(f"  pending: {','.join(prompt_ids)}")
 
     if "system" in include:
-        result["system"] = make_request("/system_stats")
+        sys_stats = make_request("/system_stats")
+        if "error" in sys_stats:
+            lines.append(f"system: error - {sys_stats.get('error')}")
+        else:
+            # Format system stats compactly
+            system = sys_stats.get("system", {})
+            devices = sys_stats.get("devices", [])
+
+            os_info = system.get("os", "unknown")
+            py_ver = system.get("python_version", "?")
+            lines.append(f"system: {os_info}, python {py_ver}")
+
+            for i, dev in enumerate(devices):
+                name = dev.get("name", "GPU")
+                vram_total = dev.get("vram_total", 0)
+                vram_free = dev.get("vram_free", 0)
+                vram_used = vram_total - vram_free
+                # Convert to GB
+                if vram_total > 0:
+                    vram_total_gb = vram_total / (1024**3)
+                    vram_used_gb = vram_used / (1024**3)
+                    pct = (vram_used / vram_total) * 100
+                    lines.append(f"  gpu{i}: {name[:30]}, {vram_used_gb:.1f}/{vram_total_gb:.1f}GB ({pct:.0f}% used)")
 
     if "history" in include:
         raw_history = make_request("/history")
         if "error" in raw_history:
-            result["history"] = raw_history
+            lines.append(f"history: error - {raw_history.get('error')}")
         else:
-            # Sort by timestamp (most recent first) - history is a dict keyed by prompt_id
+            # Sort by timestamp (most recent first)
             history_items = []
             for prompt_id, data in raw_history.items():
                 if not isinstance(data, dict):
                     continue
-                # Get timestamp from status for sorting
                 status = data.get("status", {})
                 timestamp = status.get("messages", [[0, {}]])[0][0] if status.get("messages") else 0
                 history_items.append((prompt_id, data, timestamp))
 
-            # Sort by timestamp descending (most recent first)
             history_items.sort(key=lambda x: x[2], reverse=True)
-
-            # Apply offset and limit
             total_count = len(history_items)
             history_items = history_items[history_offset:history_offset + history_limit]
 
+            lines.append(f"history: {total_count} total (showing {history_offset+1}-{history_offset+len(history_items)})")
+
             if detail == "full":
-                # Full detail but still paginated - include outputs but summarize large data
-                history_entries = []
+                lines.append("entries{id,status,time,outputs}:")
                 for prompt_id, data, _ in history_items:
                     outputs = data.get("outputs", {})
                     status = data.get("status", {})
-
-                    # Summarize outputs - just node IDs and output types, not full data
-                    output_summary = {}
-                    for node_id, node_outputs in outputs.items():
-                        if isinstance(node_outputs, dict):
-                            output_summary[node_id] = {
-                                key: f"[{len(val)} items]" if isinstance(val, list) else type(val).__name__
-                                for key, val in node_outputs.items()
-                            }
-
-                    history_entries.append({
-                        "prompt_id": prompt_id,
-                        "status": status.get("status_str", "unknown"),
-                        "completed": status.get("completed", False),
-                        "outputs": output_summary,
-                        "execution_time": _get_execution_time(status),
-                    })
-
-                result["history"] = {
-                    "total": total_count,
-                    "offset": history_offset,
-                    "limit": history_limit,
-                    "entries": history_entries
-                }
+                    status_str = status.get("status_str", "?")
+                    exec_time = _get_execution_time(status)
+                    output_nodes = ",".join(outputs.keys()) if outputs else "none"
+                    lines.append(f"  {prompt_id[:8]},{status_str},{exec_time},{output_nodes}")
             else:
-                # Summary - just prompt IDs with basic status
-                history_summary = []
+                lines.append("entries{id,status,completed}:")
                 for prompt_id, data, _ in history_items:
-                    outputs = data.get("outputs", {})
                     status = data.get("status", {})
-                    history_summary.append({
-                        "prompt_id": prompt_id,
-                        "status": status.get("status_str", "unknown"),
-                        "completed": status.get("completed", False),
-                        "output_nodes": list(outputs.keys()) if outputs else []
-                    })
+                    status_str = status.get("status_str", "?")
+                    completed = "yes" if status.get("completed", False) else "no"
+                    lines.append(f"  {prompt_id[:8]},{status_str},{completed}")
 
-                result["history"] = {
-                    "total": total_count,
-                    "offset": history_offset,
-                    "limit": history_limit,
-                    "entries": history_summary
-                }
-
-    return result
+    return "\n".join(lines)
 
 
 def _get_execution_time(status: dict) -> str:
@@ -667,9 +659,29 @@ def edit_graph(operations) -> dict:
 
         results.append(result)
 
+    # Get layout summary after all operations
+    layout_summary = get_layout_summary()
+
+    # Compact results - only keep essential info
+    def compact_result(r):
+        """Reduce result to minimal info needed."""
+        compact = {"action": r.get("action", "?")}
+        if "error" in r:
+            compact["error"] = r["error"]
+        elif "node_id" in r:
+            # For create actions, node_id is essential
+            compact["node_id"] = r["node_id"]
+        else:
+            compact["ok"] = True
+        return compact
+
+    compact_results = [compact_result(r) for r in results]
+
     # Return single result for single op
-    if len(results) == 1:
-        return results[0]
+    if len(compact_results) == 1:
+        result = compact_results[0]
+        result["layout"] = layout_summary
+        return result
 
     succeeded = [r for r in results if "error" not in r]
     failed = [r for r in results if "error" in r]
@@ -677,7 +689,8 @@ def edit_graph(operations) -> dict:
         "total": len(results),
         "succeeded": len(succeeded),
         "failed": len(failed),
-        "results": results
+        "results": compact_results,
+        "layout": layout_summary
     }
 
 
@@ -1024,124 +1037,323 @@ def move_nodes(moves) -> dict:
     }
 
 
-def get_node_info(node_id: str) -> dict:
-    """Get detailed info about a specific node in the workflow."""
+def get_node_info(node_id: str) -> str:
+    """Get detailed info about a specific node in the workflow in compact TOON-like format."""
     workflow_data = get_workflow()
 
     if "error" in workflow_data or "message" in workflow_data:
-        return workflow_data
+        return f"error: {workflow_data.get('error') or workflow_data.get('message')}"
 
     workflow = workflow_data.get("workflow", {})
     node_id_str = str(node_id)
-    node_id_int = int(node_id)
+    try:
+        node_id_int = int(node_id)
+    except ValueError:
+        return f"error: invalid node_id '{node_id}'"
 
     # Handle graph serialize format
     if "nodes" in workflow:
         for node in workflow.get("nodes", []):
             if node.get("id") == node_id_int:
-                # Get node type info for input/output details (cached)
                 node_type = node.get("type")
+                title = node.get("title") or node_type
+                pos = node.get("pos", [0, 0])
+                size = node.get("size", [200, 100])
+
+                # Handle array/dict formats
+                if isinstance(pos, dict):
+                    x, y = pos.get("0", 0), pos.get("1", 0)
+                else:
+                    x, y = pos[0] if len(pos) > 0 else 0, pos[1] if len(pos) > 1 else 0
+                if isinstance(size, dict):
+                    w, h = size.get("0", 200), size.get("1", 100)
+                else:
+                    w, h = size[0] if len(size) > 0 else 200, size[1] if len(size) > 1 else 100
+
+                lines = []
+                lines.append(f"node {node_id_int}: {title}")
+                lines.append(f"type: {node_type}")
+                lines.append(f"pos: {round(x)},{round(y)} size: {round(w)}x{round(h)}")
+
+                # Get type info for input/output details
                 type_info = {}
                 all_nodes = get_object_info_cached()
                 if "error" not in all_nodes and node_type in all_nodes:
                     type_info = all_nodes[node_type]
 
-                return {
-                    "id": node.get("id"),
-                    "type": node_type,
-                    "title": node.get("title") or node_type,
-                    "pos": node.get("pos"),
-                    "size": node.get("size"),
-                    "widgets_values": node.get("widgets_values"),
-                    "inputs": node.get("inputs", []),
-                    "outputs": node.get("outputs", []),
-                    "type_info": {
-                        "display_name": type_info.get("display_name"),
-                        "description": type_info.get("description"),
-                        "category": type_info.get("category"),
-                        "input": type_info.get("input"),
-                        "output": type_info.get("output"),
-                        "output_name": type_info.get("output_name")
-                    } if type_info else None
-                }
+                if type_info:
+                    cat = type_info.get("category", "")
+                    desc = type_info.get("description", "")
+                    if cat:
+                        lines.append(f"category: {cat}")
+                    if desc:
+                        lines.append(f"desc: {desc[:100]}")
 
-        return {"error": f"Node {node_id} not found in workflow"}
+                    # Inputs from type info
+                    input_info = type_info.get("input", {})
+                    inputs = []
+                    for group in ["required", "optional"]:
+                        if group in input_info:
+                            req_marker = "*" if group == "required" else ""
+                            for inp_name, inp_def in input_info[group].items():
+                                if isinstance(inp_def, list) and len(inp_def) > 0:
+                                    inp_type = inp_def[0] if isinstance(inp_def[0], str) else type(inp_def[0]).__name__
+                                    inputs.append(f"{inp_name}{req_marker}:{inp_type}")
+                    if inputs:
+                        lines.append(f"inputs: {','.join(inputs)}")
+
+                    # Outputs from type info
+                    outputs = type_info.get("output", [])
+                    output_names = type_info.get("output_name", outputs)
+                    if outputs:
+                        out_parts = []
+                        for i, out_type in enumerate(outputs):
+                            out_name = output_names[i] if i < len(output_names) else out_type
+                            out_parts.append(f"{out_name}:{out_type}")
+                        lines.append(f"outputs: {','.join(out_parts)}")
+
+                # Current connections (from workflow node data)
+                node_inputs = node.get("inputs", [])
+                if node_inputs:
+                    conn_parts = []
+                    for inp in node_inputs:
+                        if isinstance(inp, dict) and inp.get("link"):
+                            inp_name = inp.get("name", "?")
+                            link_id = inp.get("link")
+                            conn_parts.append(f"{inp_name}=link{link_id}")
+                    if conn_parts:
+                        lines.append(f"connected_inputs: {','.join(conn_parts)}")
+
+                node_outputs = node.get("outputs", [])
+                if node_outputs:
+                    conn_parts = []
+                    for out in node_outputs:
+                        if isinstance(out, dict) and out.get("links"):
+                            out_name = out.get("name", "?")
+                            links = out.get("links", [])
+                            conn_parts.append(f"{out_name}->links{links}")
+                    if conn_parts:
+                        lines.append(f"connected_outputs: {','.join(conn_parts)}")
+
+                # Widget values
+                widgets = node.get("widgets_values")
+                if widgets:
+                    # Compact widget display - truncate long values
+                    widget_strs = []
+                    for i, val in enumerate(widgets):
+                        val_str = str(val)
+                        if len(val_str) > 50:
+                            val_str = val_str[:47] + "..."
+                        widget_strs.append(val_str.replace(",", ";").replace("\n", "\\n"))
+                    lines.append(f"widgets[{len(widgets)}]: {','.join(widget_strs)}")
+
+                return "\n".join(lines)
+
+        return f"error: node {node_id} not found in workflow"
 
     # Handle API format
     if node_id_str in workflow:
         node_data = workflow[node_id_str]
-        return {
-            "id": node_id_str,
-            "type": node_data.get("class_type"),
-            "inputs": node_data.get("inputs", {})
-        }
+        node_type = node_data.get("class_type", "?")
+        inputs = node_data.get("inputs", {})
 
-    return {"error": f"Node {node_id} not found in workflow"}
+        lines = [f"node {node_id_str}: {node_type}"]
+        if inputs:
+            inp_parts = [f"{k}={v}" for k, v in inputs.items()]
+            lines.append(f"inputs: {','.join(inp_parts)}")
+        return "\n".join(lines)
+
+    return f"error: node {node_id} not found in workflow"
 
 
-def summarize_workflow() -> dict:
-    """Get a human-readable summary of the current workflow."""
+def summarize_workflow() -> str:
+    """Get a compact summary of the current workflow in TOON-like format.
+
+    Returns a token-efficient text representation with:
+    - Canvas bounds
+    - Node list with id, type, title, position, size
+    - Connections list
+
+    Format:
+        canvas: min_x,min_y to max_x,max_y
+        nodes[N]{id,type,title,x,y,w,h}:
+          id,type,title,x,y,w,h
+          ...
+        connections[N]{from_node:slot->to_node:slot,type}:
+          from:slot->to:slot,TYPE
+          ...
+    """
     workflow_data = get_workflow()
 
     if "error" in workflow_data or "message" in workflow_data:
-        return workflow_data
+        return f"error: {workflow_data.get('error') or workflow_data.get('message')}"
 
     workflow = workflow_data.get("workflow", {})
 
-    # Handle both formats - the graph serialize format and the API format
+    if "nodes" not in workflow:
+        return "error: No nodes in workflow"
+
+    lines = []
     nodes = []
+    min_x, min_y = float('inf'), float('inf')
+    max_x, max_y = float('-inf'), float('-inf')
 
-    if "nodes" in workflow:
-        # Graph serialize format
-        for node in workflow.get("nodes", []):
-            node_info = {
-                "id": node.get("id"),
-                "type": node.get("type"),
-                "title": node.get("title") or node.get("type"),
-                "pos": node.get("pos"),
-            }
+    # Graph serialize format
+    for node in workflow.get("nodes", []):
+        pos = node.get("pos", [0, 0])
+        size = node.get("size", [200, 100])
 
-            # Get widget values if present
-            if "widgets_values" in node:
-                node_info["widgets"] = node.get("widgets_values")
+        # Handle both array and object formats for pos
+        if isinstance(pos, dict):
+            x, y = pos.get("0", 0), pos.get("1", 0)
+        else:
+            x, y = pos[0] if len(pos) > 0 else 0, pos[1] if len(pos) > 1 else 0
 
-            nodes.append(node_info)
+        # Handle both array and object formats for size
+        if isinstance(size, dict):
+            w, h = size.get("0", 200), size.get("1", 100)
+        else:
+            w, h = size[0] if len(size) > 0 else 200, size[1] if len(size) > 1 else 100
 
-        # Get links/connections
-        links = workflow.get("links", [])
-        connections = []
+        x, y, w, h = round(x), round(y), round(w), round(h)
+
+        min_x = min(min_x, x)
+        min_y = min(min_y, y)
+        max_x = max(max_x, x + w)
+        max_y = max(max_y, y + h)
+
+        # Escape commas in title/type
+        node_type = (node.get("type") or "").replace(",", ";")
+        title = (node.get("title") or "").replace(",", ";")
+
+        nodes.append({
+            "id": node.get("id"),
+            "type": node_type,
+            "title": title,
+            "x": x, "y": y, "w": w, "h": h
+        })
+
+    # Sort by id for consistent output
+    nodes.sort(key=lambda n: int(n["id"]) if str(n["id"]).isdigit() else 0)
+
+    # Canvas bounds
+    if nodes:
+        lines.append(f"canvas: {round(min_x)},{round(min_y)} to {round(max_x)},{round(max_y)}")
+
+    # Nodes section
+    lines.append(f"nodes[{len(nodes)}]{{id,type,title,x,y,w,h}}:")
+    for n in nodes:
+        lines.append(f"  {n['id']},{n['type']},{n['title']},{n['x']},{n['y']},{n['w']},{n['h']}")
+
+    # Connections section
+    links = workflow.get("links", [])
+    if links:
+        lines.append(f"connections[{len(links)}]{{from:slot->to:slot,type}}:")
         for link in links:
             if len(link) >= 6:
-                connections.append({
-                    "link_id": link[0],
-                    "from_node": link[1],
-                    "from_slot": link[2],
-                    "to_node": link[3],
-                    "to_slot": link[4],
-                    "type": link[5]
-                })
+                # link format: [link_id, from_node, from_slot, to_node, to_slot, type]
+                lines.append(f"  {link[1]}:{link[2]}->{link[3]}:{link[4]},{link[5]}")
 
-        return {
-            "total_nodes": len(nodes),
-            "nodes": nodes,
-            "total_connections": len(connections),
-            "connections": connections
-        }
-    else:
-        # API format (prompt format)
-        for node_id, node_data in workflow.items():
-            if isinstance(node_data, dict):
-                node_info = {
-                    "id": node_id,
-                    "type": node_data.get("class_type"),
-                    "inputs": node_data.get("inputs", {})
-                }
-                nodes.append(node_info)
+    # Collision detection - O(n²) but fast for typical workflow sizes
+    collisions = []
+    for i, a in enumerate(nodes):
+        for b in nodes[i+1:]:
+            # Check rectangle intersection
+            # Two rects overlap if they overlap on both axes
+            x_overlap = max(0, min(a["x"] + a["w"], b["x"] + b["w"]) - max(a["x"], b["x"]))
+            y_overlap = max(0, min(a["y"] + a["h"], b["y"] + b["h"]) - max(a["y"], b["y"]))
+            if x_overlap > 0 and y_overlap > 0:
+                collisions.append(f"  {a['id']}<->{b['id']} (overlap: {x_overlap}x{y_overlap})")
 
-        return {
-            "total_nodes": len(nodes),
-            "nodes": nodes
-        }
+    if collisions:
+        lines.append(f"collisions[{len(collisions)}]:")
+        lines.extend(collisions)
+
+    return "\n".join(lines)
+
+
+def get_layout_summary() -> str:
+    """Get a compact layout summary showing node positions and sizes.
+
+    Returns bounding boxes for all nodes in TOON-like format (token-efficient)
+    so Claude can see occupied space and avoid collisions when placing new nodes.
+
+    Format:
+        canvas: min_x,min_y to max_x,max_y
+        nodes[N]{id,title,x,y,w,h}:
+        id,title,x,y,w,h
+        ...
+    """
+    workflow_data = get_workflow()
+
+    if "error" in workflow_data or "message" in workflow_data:
+        return "error: Could not get workflow layout"
+
+    workflow = workflow_data.get("workflow", {})
+
+    if "nodes" not in workflow:
+        return "error: No nodes in workflow"
+
+    nodes = []
+    min_x, min_y = float('inf'), float('inf')
+    max_x, max_y = float('-inf'), float('-inf')
+
+    for node in workflow.get("nodes", []):
+        pos = node.get("pos", [0, 0])
+        size = node.get("size", [200, 100])  # Default size if not available
+
+        # Handle both array and object formats for pos
+        if isinstance(pos, dict):
+            x, y = pos.get("0", 0), pos.get("1", 0)
+        else:
+            x, y = pos[0] if len(pos) > 0 else 0, pos[1] if len(pos) > 1 else 0
+
+        # Handle both array and object formats for size
+        if isinstance(size, dict):
+            w, h = size.get("0", 200), size.get("1", 100)
+        else:
+            w, h = size[0] if len(size) > 0 else 200, size[1] if len(size) > 1 else 100
+
+        # Round for cleaner output
+        x, y, w, h = round(x), round(y), round(w), round(h)
+
+        # Track canvas bounds
+        min_x = min(min_x, x)
+        min_y = min(min_y, y)
+        max_x = max(max_x, x + w)
+        max_y = max(max_y, y + h)
+
+        # Escape commas in title
+        title = (node.get("title") or node.get("type") or "").replace(",", ";")
+
+        nodes.append({
+            "id": node.get("id"),
+            "title": title,
+            "x": x,
+            "y": y,
+            "w": w,
+            "h": h
+        })
+
+    # Sort by position (top-left to bottom-right) for easier reading
+    nodes.sort(key=lambda n: (n["y"], n["x"]))
+
+    # Build TOON-like output
+    lines = []
+
+    # Canvas bounds
+    bounds_min_x = round(min_x) if min_x != float('inf') else 0
+    bounds_min_y = round(min_y) if min_y != float('inf') else 0
+    bounds_max_x = round(max_x) if max_x != float('-inf') else 0
+    bounds_max_y = round(max_y) if max_y != float('-inf') else 0
+    lines.append(f"canvas: {bounds_min_x},{bounds_min_y} to {bounds_max_x},{bounds_max_y}")
+
+    # Nodes in tabular format
+    lines.append(f"nodes[{len(nodes)}]{{id,title,x,y,w,h}}:")
+    for n in nodes:
+        lines.append(f"  {n['id']},{n['title']},{n['x']},{n['y']},{n['w']},{n['h']}")
+
+    return "\n".join(lines)
 
 
 def view_image(node_id: str = None, image_index: int = 0) -> dict:
@@ -2477,6 +2689,13 @@ def handle_request(request: dict) -> dict:
                 }
             }
 
+        # If result is already a string (e.g., TOON-like format), use it directly
+        # Otherwise JSON-serialize it
+        if isinstance(result, str):
+            text_content = result
+        else:
+            text_content = json.dumps(result, indent=2)
+
         return {
             "jsonrpc": "2.0",
             "id": request_id,
@@ -2484,7 +2703,7 @@ def handle_request(request: dict) -> dict:
                 "content": [
                     {
                         "type": "text",
-                        "text": json.dumps(result, indent=2)
+                        "text": text_content
                     }
                 ]
             }

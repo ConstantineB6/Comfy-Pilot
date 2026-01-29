@@ -129,3 +129,21 @@ Text preview nodes vary by ComfyUI installation. To find available ones:
    ```
    get_node_types(search="preview", fields=["input_types", "output_types"])
    ```
+# Package Management
+
+Prefer `uv` for package and environment management. Check if `uv` is available first:
+
+```bash
+which uv
+```
+
+If `uv` is available, use it:
+- `uv pip install <package>`
+- `uv venv`
+- `uv sync`
+
+If `uv` is NOT available, ask the user before proceeding:
+> "I'd prefer to use `uv` for package management as it's faster and more reliable. Can I install it? (`curl -LsSf https://astral.sh/uv/install.sh | sh`). If you'd rather use pip or another tool, let me know."
+
+Only fall back to pip/other tools if the user explicitly prefers them.
+
