@@ -127,6 +127,181 @@ LIMIT 10;
 -- FROM lake.project_stats AT (VERSION => 1);
 
 -------------------------------------------------------
+-- TOOL USAGE ANALYTICS
+-------------------------------------------------------
+
+-- Top 25 tools by invocation count
+SELECT
+  tool_name,
+  tool_category,
+  mcp_server,
+  total_calls,
+  sessions_used,
+  projects_used
+FROM lake.tool_stats
+ORDER BY total_calls DESC
+LIMIT 25;
+
+-- MCP server usage breakdown
+SELECT
+  mcp_server,
+  count(DISTINCT tool_name) AS tools,
+  sum(total_calls) AS total_calls,
+  sum(sessions_used) AS total_sessions
+FROM lake.tool_stats
+WHERE mcp_server IS NOT NULL
+GROUP BY mcp_server
+ORDER BY total_calls DESC;
+
+-- Tool adoption curve: when was each tool first/last used?
+SELECT
+  tool_name,
+  first_used::DATE AS first_day,
+  last_used::DATE AS last_day,
+  last_used::DATE - first_used::DATE AS span_days,
+  total_calls
+FROM lake.tool_stats
+WHERE total_calls > 5
+ORDER BY first_used;
+
+-------------------------------------------------------
+-- BABASHKA DEEP-DIVE
+-------------------------------------------------------
+
+-- Usage pattern distribution
+SELECT
+  usage_category,
+  count(*) AS calls,
+  count(DISTINCT session_id) AS sessions,
+  count(DISTINCT project_key) AS projects
+FROM lake.babashka_usage
+GROUP BY usage_category
+ORDER BY calls DESC;
+
+-- Babashka per-project breakdown
+SELECT
+  project_key,
+  count(*) AS bb_calls,
+  count(DISTINCT session_id) AS sessions,
+  array_agg(DISTINCT usage_category ORDER BY usage_category) AS categories
+FROM lake.babashka_usage
+GROUP BY project_key
+ORDER BY bb_calls DESC;
+
+-- Babashka activity timeline (daily)
+SELECT
+  ts::DATE AS day,
+  count(*) AS bb_calls,
+  count(DISTINCT session_id) AS sessions,
+  count(*) FILTER (WHERE usage_category = 'shell-exec') AS shell_calls,
+  count(*) FILTER (WHERE usage_category = 'apple-containers') AS container_calls,
+  count(*) FILTER (WHERE usage_category = 'filesystem') AS fs_calls,
+  count(*) FILTER (WHERE usage_category = 'file-read') AS read_calls,
+  count(*) FILTER (WHERE usage_category = 'file-write') AS write_calls
+FROM lake.babashka_usage
+WHERE ts IS NOT NULL
+GROUP BY day
+ORDER BY day;
+
+-- Sample babashka snippets per category
+SELECT DISTINCT ON (usage_category)
+  usage_category,
+  substr(code_snippet, 1, 200) AS example
+FROM lake.babashka_usage
+WHERE code_snippet IS NOT NULL AND code_snippet != ''
+ORDER BY usage_category;
+
+-------------------------------------------------------
+-- TOKEN ECONOMICS
+-------------------------------------------------------
+
+-- Token usage by model
+SELECT
+  model,
+  count(*) AS api_calls,
+  sum(input_tokens) AS total_input,
+  sum(output_tokens) AS total_output,
+  sum(cache_read_tokens) AS total_cache_reads,
+  sum(cache_creation_tokens) AS total_cache_creates,
+  (sum(cache_read_tokens) * 100.0 /
+    NULLIF(sum(cache_read_tokens) + sum(input_tokens), 0))::DECIMAL(5,1) AS cache_hit_pct
+FROM lake.token_usage
+WHERE model IS NOT NULL
+GROUP BY model
+ORDER BY total_input DESC;
+
+-- Daily token consumption
+SELECT
+  ts::DATE AS day,
+  sum(input_tokens) AS input_tok,
+  sum(output_tokens) AS output_tok,
+  sum(cache_read_tokens) AS cache_tok,
+  count(*) AS api_calls
+FROM lake.token_usage
+WHERE ts IS NOT NULL
+GROUP BY day
+ORDER BY day;
+
+-- Token usage per project
+SELECT
+  project_key,
+  sum(input_tokens + output_tokens) AS total_tokens,
+  sum(cache_read_tokens) AS cache_saved,
+  count(DISTINCT session_id) AS sessions
+FROM lake.token_usage
+GROUP BY project_key
+ORDER BY total_tokens DESC;
+
+-------------------------------------------------------
+-- COGNITIVE SCIENCE TABLES (from history.duckdb)
+-------------------------------------------------------
+
+-- Phase transition regimes
+SELECT * FROM lake.phase_transitions ORDER BY id;
+
+-- Reafference loop states
+SELECT * FROM lake.reafference_loop ORDER BY id;
+
+-- Strange loop cycle
+SELECT * FROM lake.strange_loop_cycle ORDER BY step;
+
+-- Rec2020 gamut with GF(3) trits
+SELECT hex, trit, trit_name, gamut, coverage
+FROM lake.rec2020_gamut ORDER BY trit, hue;
+
+-------------------------------------------------------
+-- CROSS-TABLE ANALYTICS
+-------------------------------------------------------
+
+-- Compare stats-cache totals with DuckLake computed totals
+SELECT
+  'stats-cache' AS source,
+  sum(message_count) AS messages,
+  sum(session_count) AS sessions,
+  sum(tool_call_count) AS tool_calls,
+  min(day) AS first_day,
+  max(day) AS last_day
+FROM lake.stats_cache
+UNION ALL
+SELECT
+  'ducklake' AS source,
+  (SELECT count(*) FROM lake.conversations) AS messages,
+  (SELECT count(DISTINCT session_id) FROM lake.conversations) AS sessions,
+  (SELECT count(*) FROM lake.tool_usage) AS tool_calls,
+  (SELECT min(ts)::DATE FROM lake.conversations WHERE ts IS NOT NULL) AS first_day,
+  (SELECT max(ts)::DATE FROM lake.conversations WHERE ts IS NOT NULL) AS last_day;
+
+-- Telemetry event types
+SELECT
+  event_name,
+  count(*) AS cnt,
+  min(ts) AS first_seen,
+  max(ts) AS last_seen
+FROM lake.telemetry
+GROUP BY event_name
+ORDER BY cnt DESC;
+
+-------------------------------------------------------
 -- LIVE QUERIES against raw JSONL (no DuckLake needed)
 -------------------------------------------------------
 
