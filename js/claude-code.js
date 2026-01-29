@@ -537,16 +537,75 @@ function initTerminal(terminalContainer) {
         }
     });
 
-    // Handle Shift+Enter to insert a newline instead of submitting
+    // Handle special keyboard shortcuts for macOS-style editing
     terminal.attachCustomKeyEventHandler((event) => {
-        // Shift+Enter: insert a literal newline (for multi-line input in Claude)
-        if (event.type === "keydown" && event.key === "Enter" && event.shiftKey) {
+        if (event.type !== "keydown") return true;
+
+        const isMac = navigator.platform.toUpperCase().indexOf("MAC") >= 0;
+        const modKey = isMac ? event.metaKey : event.ctrlKey;
+        const altKey = event.altKey;
+
+        // Helper to send escape sequence
+        const send = (data) => {
             if (websocket && websocket.readyState === WebSocket.OPEN) {
-                // Send newline character - Claude Code should interpret this as a line break
-                websocket.send(JSON.stringify({ type: "i", d: "\n" }));
+                websocket.send(JSON.stringify({ type: "i", d: data }));
             }
-            return false; // Prevent default Enter handling
+        };
+
+        // Shift+Enter: insert a literal newline (for multi-line input in Claude)
+        if (event.key === "Enter" && event.shiftKey) {
+            send("\n");
+            return false;
         }
+
+        // Option/Alt + Left Arrow: move word left (send ESC-b)
+        if (altKey && event.key === "ArrowLeft") {
+            send("\x1bb");
+            return false;
+        }
+
+        // Option/Alt + Right Arrow: move word right (send ESC-f)
+        if (altKey && event.key === "ArrowRight") {
+            send("\x1bf");
+        return false;
+        }
+
+        // Cmd/Ctrl + Left Arrow: move to beginning of line (send Ctrl-A)
+        if (modKey && event.key === "ArrowLeft") {
+            send("\x01");
+            return false;
+        }
+
+        // Cmd/Ctrl + Right Arrow: move to end of line (send Ctrl-E)
+        if (modKey && event.key === "ArrowRight") {
+            send("\x05");
+            return false;
+        }
+
+        // Option/Alt + Backspace: delete word backward (send ESC-DEL or Ctrl-W)
+        if (altKey && event.key === "Backspace") {
+            send("\x17"); // Ctrl-W (unix-word-rubout)
+            return false;
+        }
+
+        // Cmd/Ctrl + Backspace: delete to beginning of line (send Ctrl-U)
+        if (modKey && event.key === "Backspace") {
+            send("\x15"); // Ctrl-U (kill line backward)
+            return false;
+        }
+
+        // Option/Alt + Delete: delete word forward (send ESC-d)
+        if (altKey && event.key === "Delete") {
+            send("\x1bd");
+            return false;
+        }
+
+        // Cmd/Ctrl + Delete: delete to end of line (send Ctrl-K)
+        if (modKey && event.key === "Delete") {
+            send("\x0b"); // Ctrl-K (kill line forward)
+            return false;
+        }
+
         return true; // Allow all other keys
     });
 
