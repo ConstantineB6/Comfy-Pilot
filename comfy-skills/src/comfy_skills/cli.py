@@ -46,13 +46,18 @@ def _show_welcome() -> None:
         f"[bold]Comfy Pilot Skills[/bold] v{__version__}\n\n"
         "Deploy ComfyUI workflow skills at conversation speed.\n"
         "Tell Claude what you want. Watch it happen.\n\n"
-        "[bold]Commands:[/bold]\n"
+        "[bold]Skills:[/bold]\n"
         "  skills list                    List all available skills\n"
         "  skills search [cyan]<query>[/cyan]          Search by name or tag\n"
         "  skills info [cyan]<skill-id>[/cyan]         Show full details\n"
         "  skills install [cyan]<skill-id>[/cyan]      Download a skill\n"
-        "  skills registry                Registry stats\n"
-        "  skills --version               Show version\n\n"
+        "  skills registry                Registry stats\n\n"
+        "[bold]MLX (Apple Silicon):[/bold]\n"
+        "  skills generate [cyan]<prompt>[/cyan]       Generate image locally via mflux\n"
+        "  skills models                  List MLX models\n\n"
+        "[bold]Flox:[/bold]\n"
+        "  skills env                     Flox + effective-topos status\n"
+        "  skills flox-run [cyan]<cmd>[/cyan]          Run inside effective-topos env\n\n"
         f"[dim]Love it? Star us:[/dim] [link={REPO_URL}]{REPO_URL}[/link]",
         border_style="cyan",
     ))
@@ -242,6 +247,101 @@ def registry(ctx: click.Context) -> None:
         console.print("\n[bold]Upcoming Skills:[/bold]")
         for s in upcoming:
             console.print(f"  [yellow]{s['name']}[/yellow] - {s.get('description', '')} [dim](ETA: {s.get('estimated_release', '?')})[/dim]")
+
+
+@main.command()
+@click.argument("prompt")
+@click.option("--model", "-m", default="schnell", help="MLX model (schnell, dev, z-image-turbo, flux2-klein-4b, flux2-klein-9b, fibo, qwen)")
+@click.option("--width", "-W", default=1024, help="Image width")
+@click.option("--height", "-H", default=1024, help="Image height")
+@click.option("--steps", "-s", default=None, type=int, help="Sampling steps")
+@click.option("--seed", default=-1, help="Random seed (-1 for random)")
+@click.option("--quantize", "-q", default=8, type=int, help="Quantization bits (3-8, lower=faster)")
+@click.option("--output", "-o", default="output.png", help="Output file path")
+def generate(prompt: str, model: str, width: int, height: int, steps: int | None, seed: int, quantize: int, output: str) -> None:
+    """Generate an image with MLX on Apple Silicon (via mflux).
+
+    Runs entirely on-device using Metal. No cloud API needed.
+
+    Example: skills generate "a puffin on a cliff at sunset" -m schnell -q 8
+    """
+    from comfy_skills.mlx import MLXGenerateConfig, run_mflux
+
+    config = MLXGenerateConfig(
+        prompt=prompt,
+        model=model,
+        width=width,
+        height=height,
+        steps=steps,
+        seed=seed,
+        quantize=quantize,
+        output=output,
+    )
+    run_mflux(config)
+
+
+@main.command()
+def models() -> None:
+    """List available MLX image generation models."""
+    from comfy_skills.mlx import list_models
+
+    table = Table(title="MLX Models (Apple Silicon)", show_lines=False)
+    table.add_column("Model", style="cyan bold")
+    table.add_column("Description", style="white")
+
+    for name, desc in list_models().items():
+        table.add_row(name, desc)
+
+    console.print(table)
+    console.print("\n[dim]All models run locally on Apple Silicon via mflux.[/dim]")
+    console.print("[dim]Install: uvx --from mflux mflux-generate --help[/dim]")
+
+
+@main.command()
+def env() -> None:
+    """Show flox environment status and effective-topos integration."""
+    from comfy_skills.flox import flox_activate_cmd, flox_status
+
+    status = flox_status()
+
+    rows = [
+        f"[bold]Flox Environment[/bold]\n",
+        f"  flox installed:           {'[green]yes[/green]' if status['flox_installed'] else '[red]no[/red]'}",
+        f"  effective-topos installed: {'[green]yes[/green]' if status['effective_topos_installed'] else '[yellow]no[/yellow]'}",
+        f"  active environment:       {status['active_env'] or '[dim]none[/dim]'}",
+        f"  env path:                 [dim]{status['env_path']}[/dim]",
+    ]
+
+    if not status["effective_topos_installed"]:
+        rows.append(f"\n[bold]Install effective-topos:[/bold]")
+        rows.append(f"  [cyan]flox pull bmorphism/effective-topos[/cyan]")
+        rows.append(f"  [cyan]{flox_activate_cmd()}[/cyan]")
+    else:
+        rows.append(f"\n[bold]Activate:[/bold]")
+        rows.append(f"  [cyan]{flox_activate_cmd()}[/cyan]")
+
+    rows.append(f"\n[bold]What you get:[/bold]")
+    rows.append(f"  606 man pages | 97 info manuals | 62 packages")
+    rows.append(f"  Guile/Goblins/Hoot + OCaml + Haskell + Rust + Go")
+    rows.append(f"  radare2 + gh + tmux + tree-sitter + Gay.jl colors")
+
+    console.print(Panel(
+        "\n".join(rows),
+        title="[cyan]Flox + effective-topos[/cyan]",
+        border_style="cyan",
+    ))
+
+
+@main.command("flox-run")
+@click.argument("command", nargs=-1, required=True)
+def flox_run(command: tuple[str, ...]) -> None:
+    """Run a command inside the effective-topos flox environment.
+
+    Example: skills flox-run guile -c '(display "hello")'
+    """
+    from comfy_skills.flox import run_in_flox
+
+    run_in_flox(list(command))
 
 
 def entry() -> None:
