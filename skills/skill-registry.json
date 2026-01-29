@@ -103,6 +103,60 @@
     "contributors": 1
   },
 
+  "external_ecosystems": [
+    {
+      "id": "trailofbits-skills",
+      "name": "Trail of Bits Security Skills",
+      "source": "https://github.com/trailofbits/skills",
+      "stars": 2200,
+      "total_skills": 49,
+      "install": "claude /plugin marketplace add trailofbits/skills",
+      "description": "49 security-focused Claude Code skills from Trail of Bits. Static analysis, fuzzing, vulnerability scanning, code review, and secure development patterns.",
+      "categories": ["security", "analysis", "fuzzing", "code-review"],
+      "format": "SKILL.md with YAML frontmatter",
+      "highlights": [
+        "semgrep - Custom rule creation and analysis",
+        "codeql - Variant analysis and vulnerability detection",
+        "cargo-fuzz / libfuzzer / aflpp - Fuzzing harness generation",
+        "constant-time-analysis - Timing side-channel detection",
+        "reverse-engineering - Binary analysis with radare2/Ghidra"
+      ]
+    },
+    {
+      "id": "plurigrid-asi",
+      "name": "Plurigrid ASI Agent Skills",
+      "source": "https://github.com/plurigrid/asi",
+      "stars": 150,
+      "total_skills": 365,
+      "install": "npx ai-agent-skills install plurigrid/asi",
+      "description": "365+ AI agent skills with GF(3) balanced ternary logic. Categorical structure via ACSet data modeling, Nickel contracts for validation, and triadic skill interleaving.",
+      "categories": ["agent-skills", "categorical", "distributed", "scientific"],
+      "format": "agentskills.io specification",
+      "highlights": [
+        "GF(3) balanced ternary: +1 generator, 0 coordinator, -1 validator",
+        "effective-topos - 62-package Flox dev environment (606 man pages)",
+        "gay-integration - Deterministic coloring for visualization",
+        "acsets - Algebraic databases for relational data modeling",
+        "discopy - String diagrams and categorical quantum mechanics"
+      ]
+    },
+    {
+      "id": "sdf-flexibility",
+      "name": "Software Design for Flexibility",
+      "source": "Hanson & Sussman, 2021 (MIT Press)",
+      "description": "Design patterns for flexible software from the MIT tradition. 10 chapters with GF(3) internal structure forming balanced triads with SICP, propagators, and effective-topos.",
+      "categories": ["design-patterns", "scheme", "flexibility", "education"],
+      "format": "Skill specification with SDF chapter references",
+      "highlights": [
+        "Ch5 Evaluation - eval/apply interpreters (primary)",
+        "Ch4 Pattern Matching - rule-based dispatch",
+        "Ch7 Propagators - constraint-based programming",
+        "Ch3 Variations on a Theme - combinators and wrappers",
+        "GF(3) trit: -1 (validator) - balances with SICP (+1) and propagators (0)"
+      ]
+    }
+  ],
+
   "resources": {
     "specification": "SKILL_SPEC.md",
     "documentation": "https://github.com/anthropics/comfy-pilot/wiki/Skills",

@@ -58,6 +58,8 @@ def _show_welcome() -> None:
         "[bold]Flox:[/bold]\n"
         "  skills env                     Flox + effective-topos status\n"
         "  skills flox-run [cyan]<cmd>[/cyan]          Run inside effective-topos env\n\n"
+        "[bold]Ecosystems:[/bold]\n"
+        "  skills ecosystems              Browse external skill ecosystems\n\n"
         f"[dim]Love it? Star us:[/dim] [link={REPO_URL}]{REPO_URL}[/link]",
         border_style="cyan",
     ))
@@ -247,6 +249,45 @@ def registry(ctx: click.Context) -> None:
         console.print("\n[bold]Upcoming Skills:[/bold]")
         for s in upcoming:
             console.print(f"  [yellow]{s['name']}[/yellow] - {s.get('description', '')} [dim](ETA: {s.get('estimated_release', '?')})[/dim]")
+
+
+@main.command()
+@click.pass_context
+def ecosystems(ctx: click.Context) -> None:
+    """Browse external skill ecosystems (Trail of Bits, Plurigrid, SDF)."""
+    registry = _get_registry(ctx.obj["local"])
+    ext = registry.get("external_ecosystems", [])
+
+    if not ext:
+        console.print("[yellow]No external ecosystems found in registry[/yellow]")
+        return
+
+    for eco in ext:
+        source = eco.get("source", "")
+        name_line = f"[cyan bold]{eco['name']}[/cyan bold]"
+        if eco.get("stars"):
+            name_line += f"  [dim]{eco['stars']:,} stars[/dim]"
+
+        console.print(name_line)
+        console.print(f"  {eco['description']}")
+
+        if eco.get("total_skills"):
+            console.print(f"  [green]{eco['total_skills']} skills[/green]  Categories: {', '.join(eco.get('categories', []))}")
+
+        if eco.get("install"):
+            console.print(f"  [bold]Install:[/bold] [cyan]{eco['install']}[/cyan]")
+
+        if source.startswith("http"):
+            console.print(f"  [dim]{source}[/dim]")
+        elif source:
+            console.print(f"  [dim]Source: {source}[/dim]")
+
+        if eco.get("highlights"):
+            console.print(f"  [bold]Highlights:[/bold]")
+            for h in eco["highlights"]:
+                console.print(f"    - {h}")
+
+        console.print()
 
 
 @main.command()
