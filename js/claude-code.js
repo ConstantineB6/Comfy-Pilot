@@ -553,8 +553,10 @@ function initTerminal(terminalContainer) {
         };
 
         // Shift+Enter: insert a literal newline (for multi-line input in Claude)
+        // Send ESC + Enter sequence that terminals like iTerm2/WezTerm use for Shift+Enter
+        // This is recognized by Claude Code as multiline input (not submit)
         if (event.key === "Enter" && event.shiftKey) {
-            send("\n");
+            send("\x1b\r"); // ESC + CR - common terminal escape for Shift+Enter
             return false;
         }
 

@@ -493,7 +493,7 @@ def run(action: str = "queue", node_ids = None) -> dict:
     return {"error": f"Unknown action: {action}. Use 'queue' or 'interrupt'."}
 
 
-def edit_graph(operations) -> dict:
+def edit_graph(operations) -> str:
     """Edit the workflow graph with one or more operations.
 
     Args:
@@ -517,7 +517,7 @@ def edit_graph(operations) -> dict:
     # Cache node types for validation
     all_nodes = get_object_info_cached()
     if "error" in all_nodes:
-        return all_nodes
+        return f"error: {all_nodes.get('error', 'Failed to get node types')}"
 
     results = []
     created_nodes = {}  # Map temp refs to real node IDs
@@ -659,39 +659,117 @@ def edit_graph(operations) -> dict:
 
         results.append(result)
 
-    # Get layout summary after all operations
-    layout_summary = get_layout_summary()
-
-    # Compact results - only keep essential info
-    def compact_result(r):
-        """Reduce result to minimal info needed."""
-        compact = {"action": r.get("action", "?")}
-        if "error" in r:
-            compact["error"] = r["error"]
-        elif "node_id" in r:
-            # For create actions, node_id is essential
-            compact["node_id"] = r["node_id"]
-        else:
-            compact["ok"] = True
-        return compact
-
-    compact_results = [compact_result(r) for r in results]
-
-    # Return single result for single op
-    if len(compact_results) == 1:
-        result = compact_results[0]
-        result["layout"] = layout_summary
-        return result
-
+    # Build TOON response
     succeeded = [r for r in results if "error" not in r]
     failed = [r for r in results if "error" in r]
-    return {
-        "total": len(results),
-        "succeeded": len(succeeded),
-        "failed": len(failed),
-        "results": compact_results,
-        "layout": layout_summary
-    }
+
+    lines = []
+
+    # Status line
+    if failed:
+        lines.append(f"failed: {len(failed)}/{len(results)}")
+    else:
+        lines.append(f"ok: {len(results)}/{len(results)}")
+
+    # Show created node IDs
+    created_ids = [str(r.get("node_id")) for r in results if r.get("action") == "create" and "node_id" in r]
+    if created_ids:
+        lines.append(f"created: {','.join(created_ids)}")
+
+    # Show errors only if there are failures
+    if failed:
+        lines.append("errors:")
+        for r in failed:
+            idx = r.get("index", "?")
+            action = r.get("action", "?")
+            error = r.get("error", "unknown error")
+            lines.append(f"  [{idx}] {action}: {error}")
+
+    # Get affected node IDs (created, moved, resized)
+    affected_ids = set()
+    for r in results:
+        if "error" not in r:
+            if "node_id" in r:
+                affected_ids.add(int(r["node_id"]))
+            # For move/resize, the node_id is in the original op
+
+    # Also track from operations directly
+    for i, op in enumerate(operations if isinstance(operations, list) else [operations]):
+        action = op.get("action", "")
+        if action in ("move", "resize", "create"):
+            node_id = op.get("node_id")
+            if node_id:
+                # Resolve refs
+                if node_id in created_nodes:
+                    node_id = created_nodes[node_id]
+                try:
+                    affected_ids.add(int(node_id))
+                except (ValueError, TypeError):
+                    pass
+
+    # Get current workflow state to find affected nodes and collisions
+    workflow_data = get_workflow()
+    if "error" not in workflow_data and "workflow" in workflow_data:
+        workflow = workflow_data.get("workflow", {})
+
+        if "nodes" in workflow:
+            all_nodes = []
+            affected_nodes = []
+
+            for node in workflow.get("nodes", []):
+                pos = node.get("pos", [0, 0])
+                size = node.get("size", [200, 100])
+
+                # Handle both array and object formats
+                if isinstance(pos, dict):
+                    x, y = pos.get("0", 0), pos.get("1", 0)
+                else:
+                    x, y = pos[0] if len(pos) > 0 else 0, pos[1] if len(pos) > 1 else 0
+                if isinstance(size, dict):
+                    w, h = size.get("0", 200), size.get("1", 100)
+                else:
+                    w, h = size[0] if len(size) > 0 else 200, size[1] if len(size) > 1 else 100
+
+                x, y, w, h = round(x), round(y), round(w), round(h)
+                title = (node.get("title") or node.get("type") or "").replace(",", ";")
+
+                node_data = {
+                    "id": node.get("id"),
+                    "title": title,
+                    "x": x, "y": y, "w": w, "h": h
+                }
+                all_nodes.append(node_data)
+
+                if node.get("id") in affected_ids:
+                    affected_nodes.append(node_data)
+
+            # Show affected nodes (only the ones we touched)
+            if affected_nodes:
+                lines.append(f"affected[{len(affected_nodes)}]{{id,title,x,y,w,h}}:")
+                for n in affected_nodes:
+                    lines.append(f"  {n['id']},{n['title']},{n['x']},{n['y']},{n['w']},{n['h']}")
+
+            # Check for collisions involving affected nodes
+            collisions = []
+            for affected in affected_nodes:
+                for other in all_nodes:
+                    if affected["id"] == other["id"]:
+                        continue
+                    # Check rectangle intersection
+                    x_overlap = max(0, min(affected["x"] + affected["w"], other["x"] + other["w"]) - max(affected["x"], other["x"]))
+                    y_overlap = max(0, min(affected["y"] + affected["h"], other["y"] + other["h"]) - max(affected["y"], other["y"]))
+                    if x_overlap > 0 and y_overlap > 0:
+                        # Avoid duplicate pairs
+                        pair = tuple(sorted([affected["id"], other["id"]]))
+                        collision_str = f"  {pair[0]}<->{pair[1]} (overlap: {x_overlap}x{y_overlap})"
+                        if collision_str not in collisions:
+                            collisions.append(collision_str)
+
+            if collisions:
+                lines.append(f"collisions[{len(collisions)}]:")
+                lines.extend(collisions)
+
+    return "\n".join(lines)
 
 
 def run_node(node_ids) -> dict:
