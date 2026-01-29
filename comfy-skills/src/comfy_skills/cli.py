@@ -26,6 +26,8 @@ from comfy_skills.registry import (
 
 console = Console()
 
+REPO_URL = "https://github.com/ConstantineB6/Comfy-Pilot"
+
 
 def _run(coro):
     """Run an async coroutine."""
@@ -39,7 +41,24 @@ def _get_registry(local: str | None) -> dict:
     return _run(fetch_registry())
 
 
-@click.group()
+def _show_welcome() -> None:
+    console.print(Panel(
+        f"[bold]Comfy Pilot Skills[/bold] v{__version__}\n\n"
+        "Deploy ComfyUI workflow skills at conversation speed.\n"
+        "Tell Claude what you want. Watch it happen.\n\n"
+        "[bold]Commands:[/bold]\n"
+        "  skills list                    List all available skills\n"
+        "  skills search [cyan]<query>[/cyan]          Search by name or tag\n"
+        "  skills info [cyan]<skill-id>[/cyan]         Show full details\n"
+        "  skills install [cyan]<skill-id>[/cyan]      Download a skill\n"
+        "  skills registry                Registry stats\n"
+        "  skills --version               Show version\n\n"
+        f"[dim]Love it? Star us:[/dim] [link={REPO_URL}]{REPO_URL}[/link]",
+        border_style="cyan",
+    ))
+
+
+@click.group(invoke_without_command=True)
 @click.version_option(__version__, prog_name="comfy-skills")
 @click.option(
     "--local",
@@ -52,6 +71,8 @@ def main(ctx: click.Context, local: str | None) -> None:
     """Deploy ComfyUI workflow skills at conversation speed."""
     ctx.ensure_object(dict)
     ctx.obj["local"] = local
+    if ctx.invoked_subcommand is None:
+        _show_welcome()
 
 
 @main.command("list")
@@ -223,5 +244,13 @@ def registry(ctx: click.Context) -> None:
             console.print(f"  [yellow]{s['name']}[/yellow] - {s.get('description', '')} [dim](ETA: {s.get('estimated_release', '?')})[/dim]")
 
 
-if __name__ == "__main__":
+def entry() -> None:
+    """Entry point that shows welcome panel on bare invocation."""
+    if len(sys.argv) == 1:
+        _show_welcome()
+        return
     main()
+
+
+if __name__ == "__main__":
+    entry()

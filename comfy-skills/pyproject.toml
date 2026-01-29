@@ -23,8 +23,8 @@ dependencies = [
 ]
 
 [project.scripts]
-skills = "comfy_skills.cli:main"
-comfy-skills = "comfy_skills.cli:main"
+skills = "comfy_skills.cli:entry"
+comfy-skills = "comfy_skills.cli:entry"
 
 [project.urls]
 Homepage = "https://github.com/ConstantineB6/Comfy-Pilot"
