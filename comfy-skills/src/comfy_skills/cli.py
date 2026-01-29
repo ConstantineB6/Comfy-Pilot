@@ -1,0 +1,227 @@
+"""CLI entry point for comfy-skills."""
+
+from __future__ import annotations
+
+import asyncio
+import json
+import sys
+from pathlib import Path
+
+import click
+from rich.console import Console
+from rich.panel import Panel
+from rich.table import Table
+from rich.text import Text
+
+from comfy_skills import __version__
+from comfy_skills.registry import (
+    CACHE_DIR,
+    download_skill,
+    fetch_registry,
+    fetch_skill_detail,
+    list_skills,
+    load_local_registry,
+    search_skills,
+)
+
+console = Console()
+
+
+def _run(coro):
+    """Run an async coroutine."""
+    return asyncio.run(coro)
+
+
+def _get_registry(local: str | None) -> dict:
+    """Load registry from local path or remote."""
+    if local:
+        return load_local_registry(Path(local))
+    return _run(fetch_registry())
+
+
+@click.group()
+@click.version_option(__version__, prog_name="comfy-skills")
+@click.option(
+    "--local",
+    envvar="COMFY_PILOT_PATH",
+    default=None,
+    help="Path to local comfy-pilot checkout (or set COMFY_PILOT_PATH)",
+)
+@click.pass_context
+def main(ctx: click.Context, local: str | None) -> None:
+    """Deploy ComfyUI workflow skills at conversation speed."""
+    ctx.ensure_object(dict)
+    ctx.obj["local"] = local
+
+
+@main.command("list")
+@click.option("--category", "-c", default=None, help="Filter by category")
+@click.option("--json-output", "-j", is_flag=True, help="Output as JSON")
+@click.pass_context
+def list_cmd(ctx: click.Context, category: str | None, json_output: bool) -> None:
+    """List all available skills."""
+    registry = _get_registry(ctx.obj["local"])
+    skills = list_skills(registry)
+
+    if category:
+        skills = [s for s in skills if s.category == category]
+
+    if json_output:
+        click.echo(json.dumps([{"id": s.id, "name": s.name, "version": s.version, "category": s.category, "rating": s.rating, "downloads": s.downloads} for s in skills], indent=2))
+        return
+
+    table = Table(title="Available Skills", show_lines=False)
+    table.add_column("Skill", style="cyan bold")
+    table.add_column("Version", style="green")
+    table.add_column("Category", style="yellow")
+    table.add_column("Rating", justify="right")
+    table.add_column("Downloads", justify="right", style="blue")
+    table.add_column("Status", style="magenta")
+
+    for s in skills:
+        star = "*" if s.featured else ""
+        rating = f"{s.rating:.1f}" if s.rating else "-"
+        table.add_row(
+            f"{star}{s.name}",
+            s.version,
+            s.category,
+            rating,
+            f"{s.downloads:,}",
+            s.status,
+        )
+
+    console.print(table)
+
+    stats = registry.get("stats", {})
+    if stats:
+        console.print(
+            f"\n[dim]{stats.get('total_downloads', 0):,} total downloads | "
+            f"{stats.get('active_users', 0):,} active users | "
+            f"{stats.get('contributors', 0)} contributors[/dim]"
+        )
+
+
+@main.command()
+@click.argument("query")
+@click.pass_context
+def search(ctx: click.Context, query: str) -> None:
+    """Search skills by name, description, or tags."""
+    registry = _get_registry(ctx.obj["local"])
+    skills = list_skills(registry)
+    results = search_skills(skills, query)
+
+    if not results:
+        console.print(f"[yellow]No skills matching '{query}'[/yellow]")
+        return
+
+    for s in results:
+        featured = " [green]*featured*[/green]" if s.featured else ""
+        console.print(f"[cyan bold]{s.name}[/cyan bold] v{s.version}{featured}")
+        console.print(f"  {s.description}")
+        console.print(f"  [dim]Category: {s.category} | Rating: {s.rating} | Downloads: {s.downloads:,}[/dim]")
+        console.print()
+
+
+@main.command()
+@click.argument("skill_id")
+@click.pass_context
+def info(ctx: click.Context, skill_id: str) -> None:
+    """Show detailed information about a skill."""
+    registry = _get_registry(ctx.obj["local"])
+    skills = list_skills(registry)
+    matches = [s for s in skills if s.id == skill_id]
+
+    if not matches:
+        console.print(f"[red]Skill '{skill_id}' not found[/red]")
+        sys.exit(1)
+
+    skill = matches[0]
+    detail = _run(fetch_skill_detail(skill))
+
+    console.print(Panel(
+        f"[bold]{detail.skill.name}[/bold] v{detail.skill.version}\n"
+        f"by {detail.skill.author}\n\n"
+        f"{detail.skill.description}",
+        title=f"[cyan]{detail.skill.id}[/cyan]",
+        border_style="cyan",
+    ))
+
+    if detail.inputs:
+        console.print("\n[bold]Inputs:[/bold]")
+        for name, spec in detail.inputs.items():
+            req = "[red]*[/red]" if spec.get("required") else ""
+            default = f" [dim](default: {spec.get('default')})[/dim]" if "default" in spec else ""
+            console.print(f"  {req}[cyan]{name}[/cyan]: {spec.get('type', '?')} - {spec.get('description', '')}{default}")
+
+    if detail.nodes_created:
+        console.print(f"\n[bold]Nodes Created:[/bold] {', '.join(detail.nodes_created)}")
+
+    if detail.performance:
+        perf = detail.performance
+        console.print(f"\n[bold]Performance:[/bold]")
+        console.print(f"  Time: ~{perf.get('estimated_time_seconds', '?')}s | VRAM: {perf.get('estimated_vram_gb', '?')}GB | RAM: {perf.get('estimated_ram_gb', '?')}GB")
+        if perf.get("notes"):
+            console.print(f"  [dim]{perf['notes']}[/dim]")
+
+    if detail.examples:
+        console.print(f"\n[bold]Examples:[/bold]")
+        for ex in detail.examples:
+            console.print(f"  [green]{ex.get('name', 'Example')}[/green]: \"{ex.get('positive_prompt', '')}\"")
+
+
+@main.command()
+@click.argument("skill_id")
+@click.option("--dest", "-d", default=None, help="Destination directory")
+@click.pass_context
+def install(ctx: click.Context, skill_id: str, dest: str | None) -> None:
+    """Download and install a skill locally."""
+    registry = _get_registry(ctx.obj["local"])
+    skills = list_skills(registry)
+    matches = [s for s in skills if s.id == skill_id]
+
+    if not matches:
+        console.print(f"[red]Skill '{skill_id}' not found[/red]")
+        sys.exit(1)
+
+    skill = matches[0]
+    dest_path = Path(dest) if dest else CACHE_DIR / "installed" / skill.id
+
+    with console.status(f"[bold green]Installing {skill.name}..."):
+        result = _run(download_skill(skill, dest_path))
+
+    console.print(f"[green]Installed {skill.name} v{skill.version} to {result}[/green]")
+
+    if (result / "workflow.json").exists():
+        console.print(f"\n[bold]Deploy with Claude Code:[/bold]")
+        console.print(f'  Tell Claude: "Load the skill from {result}/workflow.json"')
+
+
+@main.command()
+@click.pass_context
+def registry(ctx: click.Context) -> None:
+    """Show registry statistics."""
+    reg = _get_registry(ctx.obj["local"])
+    stats = reg.get("stats", {})
+    categories = reg.get("categories", {})
+
+    console.print(Panel(
+        f"[bold]Registry v{reg.get('version', '?')}[/bold]\n"
+        f"Updated: {reg.get('registry_version', '?')}\n\n"
+        f"Total skills: {reg.get('total_skills', 0)}\n"
+        f"Downloads: {stats.get('total_downloads', 0):,}\n"
+        f"Active users: {stats.get('active_users', 0):,}\n"
+        f"Contributors: {stats.get('contributors', 0)}\n\n"
+        f"Categories: {', '.join(f'{k} ({v})' for k, v in categories.items())}",
+        title="[cyan]Comfy Pilot Skills Registry[/cyan]",
+        border_style="cyan",
+    ))
+
+    upcoming = reg.get("upcoming_skills", [])
+    if upcoming:
+        console.print("\n[bold]Upcoming Skills:[/bold]")
+        for s in upcoming:
+            console.print(f"  [yellow]{s['name']}[/yellow] - {s.get('description', '')} [dim](ETA: {s.get('estimated_release', '?')})[/dim]")
+
+
+if __name__ == "__main__":
+    main()
