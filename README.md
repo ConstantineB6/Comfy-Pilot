@@ -1,6 +1,6 @@
 # Comfy Pilot
 
-![Comfy Pilot](thumbnail.png)
+![Comfy Pilot](thumbnail.jpg)
 
 MCP server + embedded terminal that lets Claude Code see and edit your ComfyUI workflows.
 
