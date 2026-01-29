@@ -1,8 +1,36 @@
 # Comfy Pilot
 
+MCP server + embedded terminal that lets Claude Code see and edit your ComfyUI workflows.
+
 ![Comfy Pilot](thumbnail.jpg)
 
-MCP server + embedded terminal that lets Claude Code see and edit your ComfyUI workflows.
+**[View on ComfyUI Registry](https://registry.comfy.org/publishers/constantine/nodes/comfy-pilot)**
+
+## Installation
+
+**CLI (Recommended):**
+```bash
+comfy node install comfy-pilot
+```
+
+**ComfyUI Manager:**
+1. Open ComfyUI
+2. Click **Manager** → **Install Custom Nodes**
+3. Search for "Comfy Pilot"
+4. Click **Install**
+5. Restart ComfyUI
+
+**Git Clone:**
+```bash
+cd ~/Documents/ComfyUI/custom_nodes && git clone https://github.com/ConstantineB6/comfy-pilot.git
+```
+
+Claude Code CLI will be installed automatically if not found.
+
+## Requirements
+
+- ComfyUI
+- Python 3.8+
 
 ## Features
 
@@ -10,36 +38,6 @@ MCP server + embedded terminal that lets Claude Code see and edit your ComfyUI w
 - **Embedded Terminal** - Full xterm.js terminal running Claude Code right inside ComfyUI
 - **Image Viewing** - Claude can see outputs from Preview Image and Save Image nodes
 - **Graph Editing** - Create, delete, move, and connect nodes programmatically
-
-## Requirements
-
-- ComfyUI
-- Python 3.8+
-
-## Installation
-
-### Option 1: ComfyUI Manager (Recommended)
-
-1. Open ComfyUI
-2. Click **Manager** → **Install Custom Nodes**
-3. Search for "Comfy Pilot"
-4. Click **Install**
-5. Restart ComfyUI
-
-### Option 2: Registry CLI
-
-```bash
-comfy node install comfy-pilot
-```
-
-### Option 3: Git Clone
-
-```bash
-cd /path/to/ComfyUI/custom_nodes
-git clone https://github.com/ConstantineB6/comfy-pilot.git
-```
-
-Claude Code CLI will be installed automatically if not found.
 
 ## Usage
 
