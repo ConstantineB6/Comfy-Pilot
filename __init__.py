@@ -50,14 +50,19 @@ def has_claude_conversation(working_dir=None):
     return len(conversation_files) > 0
 
 
-def find_executable(name):
+def find_executable(name, verbose=False):
     """Find an executable, checking common paths if not in PATH."""
     import shutil
 
     # First try the standard PATH
     path = shutil.which(name)
     if path:
+        if verbose:
+            print(f"[Claude Code] Found {name} via shutil.which: {path}")
         return path
+
+    if verbose:
+        print(f"[Claude Code] {name} not in PATH, checking common locations...")
 
     # Common locations for npm/node/claude on different systems
     common_paths = [
@@ -66,7 +71,6 @@ def find_executable(name):
         f"/usr/local/bin/{name}",
         # Linux common paths
         f"/usr/bin/{name}",
-        f"/usr/local/bin/{name}",
         # nvm default location
         os.path.expanduser(f"~/.nvm/versions/node/*/bin/{name}"),
         # npm global installs
@@ -78,17 +82,27 @@ def find_executable(name):
         os.path.expanduser(f"~/anaconda3/bin/{name}"),
         os.path.expanduser(f"~/miniconda3/bin/{name}"),
         f"/opt/conda/bin/{name}",
+        # runpod / cloud environments
+        f"/workspace/.local/bin/{name}",
+        f"/root/.local/bin/{name}",
+        f"/home/*/.local/bin/{name}",
     ]
 
     import glob
     for pattern in common_paths:
         matches = glob.glob(pattern)
+        if verbose and matches:
+            print(f"[Claude Code] Checking {pattern}: found {matches}")
         if matches:
             # Return the first match (or latest version for nvm-style paths)
             matches.sort(reverse=True)
             if os.path.isfile(matches[0]) and os.access(matches[0], os.X_OK):
+                if verbose:
+                    print(f"[Claude Code] Found executable: {matches[0]}")
                 return matches[0]
 
+    if verbose:
+        print(f"[Claude Code] {name} not found in any common location")
     return None
 
 
@@ -133,7 +147,8 @@ def get_claude_command(working_dir=None):
     Returns the full path to claude if found via find_executable, otherwise just 'claude'.
     """
     # Try to get the full path to claude
-    claude_path = find_executable("claude")
+    claude_path = find_executable("claude", verbose=True)
+    print(f"[Claude Code] find_executable('claude') returned: {claude_path}")
     if claude_path:
         if has_claude_conversation(working_dir):
             return f"{claude_path} -c"
@@ -141,6 +156,7 @@ def get_claude_command(working_dir=None):
             return claude_path
     else:
         # Fallback - let the shell try to find it
+        print("[Claude Code] Warning: claude not found in common paths, falling back to 'claude'")
         if has_claude_conversation(working_dir):
             return "claude -c"
         else:
