@@ -1,0 +1,94 @@
+{
+  "id": "upscale-4x",
+  "name": "4x Upscale (Real-ESRGAN)",
+  "version": "1.0.0",
+  "author": "comfy-pilot",
+  "description": "Upscale images to 4x resolution using Real-ESRGAN. No diffusion sampling required - fast, deterministic, model-based upscaling.",
+  "category": "processing",
+  "tags": ["upscale", "esrgan", "super-resolution", "enhance", "core"],
+  "repository": "https://github.com/ConstantineB6/Comfy-Pilot/tree/main/skills/core/upscale-4x",
+
+  "metadata": {
+    "comfyui_min_version": "0.1.0",
+    "python_min_version": "3.8",
+    "dependencies": ["comfyui_core"],
+    "supported_models": [
+      "RealESRGAN_x4plus.pth",
+      "RealESRGAN_x4plus_anime_6B.pth",
+      "4x-UltraSharp.pth",
+      "4x_NMKD-Siax_200k.pth"
+    ],
+    "stability": "production",
+    "maintenance_status": "active"
+  },
+
+  "inputs": {
+    "input_image": {
+      "type": "string",
+      "description": "Image to upscale",
+      "required": true
+    },
+    "upscale_model": {
+      "type": "string",
+      "description": "Upscale model to use",
+      "default": "RealESRGAN_x4plus.pth",
+      "required": true,
+      "options": [
+        "RealESRGAN_x4plus.pth",
+        "RealESRGAN_x4plus_anime_6B.pth",
+        "4x-UltraSharp.pth",
+        "4x_NMKD-Siax_200k.pth"
+      ],
+      "notes": "Place models in ComfyUI/models/upscale_models/. Find more at openmodeldb.info"
+    }
+  },
+
+  "outputs": {
+    "image": {
+      "type": "image",
+      "description": "Upscaled image at 4x resolution",
+      "format": "RGBA",
+      "resolution": "4x input dimensions"
+    }
+  },
+
+  "performance": {
+    "estimated_time_seconds": 5,
+    "estimated_vram_gb": 2,
+    "estimated_ram_gb": 4,
+    "device": "gpu_recommended",
+    "notes": "Very fast - no iterative sampling. A 512x512 image becomes 2048x2048. Large input images may require significant VRAM."
+  },
+
+  "nodes_created": [
+    "LoadImage",
+    "UpscaleModelLoader",
+    "ImageUpscaleWithModel",
+    "PreviewImage"
+  ],
+
+  "examples": [
+    {
+      "name": "Photo Upscale",
+      "description": "Upscale a photo with Real-ESRGAN for sharp detail preservation",
+      "upscale_model": "RealESRGAN_x4plus.pth"
+    },
+    {
+      "name": "Anime Upscale",
+      "description": "Upscale anime/illustration with dedicated anime model",
+      "upscale_model": "RealESRGAN_x4plus_anime_6B.pth"
+    },
+    {
+      "name": "Ultra Sharp",
+      "description": "Maximum sharpness upscale for detailed renders",
+      "upscale_model": "4x-UltraSharp.pth"
+    }
+  ],
+
+  "changelog": {
+    "1.0.0": "Initial release - ESRGAN-based 4x upscaling"
+  },
+
+  "license": "MIT",
+  "updated": "2025-01-28T20:00:00Z"
+}

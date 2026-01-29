@@ -1,0 +1,181 @@
+{
+  "id": "controlnet-canny",
+  "name": "ControlNet Canny Edge",
+  "version": "1.0.0",
+  "author": "comfy-pilot",
+  "description": "Generate images guided by edge structure from a reference image. Canny edge detection extracts outlines, ControlNet follows them during generation.",
+  "category": "advanced",
+  "tags": ["controlnet", "canny", "edge", "structure", "guided", "core"],
+  "repository": "https://github.com/ConstantineB6/Comfy-Pilot/tree/main/skills/core/controlnet-canny",
+
+  "metadata": {
+    "comfyui_min_version": "0.1.0",
+    "python_min_version": "3.8",
+    "dependencies": ["comfyui_core"],
+    "supported_models": [
+      "sd_xl_base_1.0.safetensors",
+      "control-lora-canny-rank256.safetensors"
+    ],
+    "stability": "production",
+    "maintenance_status": "active"
+  },
+
+  "inputs": {
+    "checkpoint_name": {
+      "type": "string",
+      "description": "Base model checkpoint",
+      "default": "sd_xl_base_1.0.safetensors",
+      "required": true
+    },
+    "controlnet_model": {
+      "type": "string",
+      "description": "ControlNet model for canny edges",
+      "default": "control-lora-canny-rank256.safetensors",
+      "required": true,
+      "notes": "Place in ComfyUI/models/controlnet/"
+    },
+    "reference_image": {
+      "type": "string",
+      "description": "Image to extract edges from",
+      "required": true
+    },
+    "positive_prompt": {
+      "type": "string",
+      "description": "What to generate following the edge structure",
+      "required": true,
+      "examples": [
+        "architectural photo, modern building, sharp details",
+        "anime character, vibrant colors, detailed"
+      ]
+    },
+    "negative_prompt": {
+      "type": "string",
+      "description": "What to avoid",
+      "default": "blurry, low quality, distorted, artifacts"
+    },
+    "canny_low": {
+      "type": "integer",
+      "description": "Canny edge detection low threshold",
+      "default": 100,
+      "min": 0,
+      "max": 500,
+      "notes": "Lower = more edges detected"
+    },
+    "canny_high": {
+      "type": "integer",
+      "description": "Canny edge detection high threshold",
+      "default": 200,
+      "min": 0,
+      "max": 500,
+      "notes": "Higher = only strong edges kept"
+    },
+    "controlnet_strength": {
+      "type": "number",
+      "description": "How strongly to follow the edge structure",
+      "default": 1.0,
+      "min": 0.0,
+      "max": 2.0,
+      "notes": "0.5-0.8 for loose guidance, 1.0 for strict following"
+    },
+    "steps": {
+      "type": "integer",
+      "description": "Sampling steps",
+      "default": 30,
+      "min": 1,
+      "max": 150
+    },
+    "cfg_scale": {
+      "type": "number",
+      "description": "Prompt adherence",
+      "default": 7.5,
+      "min": 1.0,
+      "max": 30.0
+    },
+    "width": {
+      "type": "integer",
+      "description": "Output width",
+      "default": 1024,
+      "min": 512,
+      "max": 2048
+    },
+    "height": {
+      "type": "integer",
+      "description": "Output height",
+      "default": 1024,
+      "min": 512,
+      "max": 2048
+    },
+    "seed": {
+      "type": "integer",
+      "description": "Random seed",
+      "default": -1
+    }
+  },
+
+  "outputs": {
+    "image": {
+      "type": "image",
+      "description": "Generated image following edge structure",
+      "format": "RGBA",
+      "resolution": "variable"
+    }
+  },
+
+  "performance": {
+    "estimated_time_seconds": 50,
+    "estimated_vram_gb": 10,
+    "estimated_ram_gb": 6,
+    "device": "nvidia_gpu_recommended",
+    "notes": "ControlNet adds ~20% overhead per iteration. T2I-Adapters are faster alternatives with nearly zero speed impact."
+  },
+
+  "nodes_created": [
+    "CheckpointLoaderSimple",
+    "ControlNetLoader",
+    "LoadImage",
+    "Canny",
+    "CLIPTextEncode",
+    "ControlNetApplyAdvanced",
+    "EmptyLatentImage",
+    "KSampler",
+    "VAEDecode",
+    "PreviewImage"
+  ],
+
+  "examples": [
+    {
+      "name": "Architecture Render",
+      "positive_prompt": "architectural visualization, modern glass building, photorealistic, 8k",
+      "negative_prompt": "sketch, rough, blurry",
+      "controlnet_strength": 1.0,
+      "canny_low": 100,
+      "canny_high": 200,
+      "steps": 35
+    },
+    {
+      "name": "Anime from Photo",
+      "positive_prompt": "anime style, vibrant colors, cel shading, detailed, studio ghibli",
+      "negative_prompt": "photorealistic, 3d render, blurry",
+      "controlnet_strength": 0.8,
+      "canny_low": 80,
+      "canny_high": 180,
+      "steps": 30
+    },
+    {
+      "name": "Loose Guidance",
+      "positive_prompt": "abstract painting, watercolor, flowing shapes, artistic",
+      "negative_prompt": "photorealistic, rigid, mechanical",
+      "controlnet_strength": 0.5,
+      "canny_low": 150,
+      "canny_high": 250,
+      "steps": 25
+    }
+  ],
+
+  "changelog": {
+    "1.0.0": "Initial release - Canny ControlNet with edge detection"
+  },
+
+  "license": "MIT",
+  "updated": "2025-01-28T20:00:00Z"
+}

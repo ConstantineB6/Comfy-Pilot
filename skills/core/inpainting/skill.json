@@ -1,0 +1,136 @@
+{
+  "id": "inpainting",
+  "name": "Inpainting",
+  "version": "1.0.0",
+  "author": "comfy-pilot",
+  "description": "Selectively regenerate masked regions of an image. Remove objects, fill backgrounds, or replace content while blending seamlessly.",
+  "category": "processing",
+  "tags": ["inpainting", "mask", "edit", "remove", "fill", "core"],
+  "repository": "https://github.com/ConstantineB6/Comfy-Pilot/tree/main/skills/core/inpainting",
+
+  "metadata": {
+    "comfyui_min_version": "0.1.0",
+    "python_min_version": "3.8",
+    "dependencies": ["comfyui_core"],
+    "supported_models": [
+      "sd_xl_base_1.0.safetensors",
+      "sd-v1-5-inpainting.ckpt"
+    ],
+    "stability": "production",
+    "maintenance_status": "active"
+  },
+
+  "inputs": {
+    "checkpoint_name": {
+      "type": "string",
+      "description": "Model checkpoint (inpainting-specific models give best results but any model works)",
+      "default": "sd_xl_base_1.0.safetensors",
+      "required": true
+    },
+    "input_image": {
+      "type": "string",
+      "description": "Image with alpha channel mask (transparent = area to regenerate). Use the mask editor in ComfyUI by right-clicking the LoadImage node.",
+      "required": true
+    },
+    "positive_prompt": {
+      "type": "string",
+      "description": "What to generate in the masked area",
+      "required": true,
+      "examples": [
+        "green grass, natural landscape, seamless blend",
+        "blue sky with clouds, natural lighting"
+      ]
+    },
+    "negative_prompt": {
+      "type": "string",
+      "description": "What to avoid in the filled region",
+      "default": "blurry, low quality, seams, artifacts, mismatched"
+    },
+    "grow_mask_by": {
+      "type": "integer",
+      "description": "Expand mask edges by N pixels for smoother blending",
+      "default": 6,
+      "min": 0,
+      "max": 64,
+      "notes": "6-8 pixels works well for most cases"
+    },
+    "steps": {
+      "type": "integer",
+      "description": "Sampling steps",
+      "default": 30,
+      "min": 1,
+      "max": 150
+    },
+    "cfg_scale": {
+      "type": "number",
+      "description": "Prompt adherence",
+      "default": 8.0,
+      "min": 1.0,
+      "max": 30.0,
+      "notes": "Slightly higher than txt2img (8-10) helps inpainting match context"
+    },
+    "seed": {
+      "type": "integer",
+      "description": "Random seed",
+      "default": -1
+    }
+  },
+
+  "outputs": {
+    "image": {
+      "type": "image",
+      "description": "Image with masked region regenerated",
+      "format": "RGBA",
+      "resolution": "matches input"
+    }
+  },
+
+  "performance": {
+    "estimated_time_seconds": 35,
+    "estimated_vram_gb": 8,
+    "estimated_ram_gb": 4,
+    "device": "nvidia_gpu_recommended",
+    "notes": "Faster than full generation since only masked region is processed at full detail"
+  },
+
+  "nodes_created": [
+    "CheckpointLoaderSimple",
+    "LoadImage",
+    "VAEEncodeForInpaint",
+    "CLIPTextEncode",
+    "KSampler",
+    "VAEDecode",
+    "PreviewImage"
+  ],
+
+  "examples": [
+    {
+      "name": "Object Removal",
+      "positive_prompt": "clean background, natural landscape, grass and trees",
+      "negative_prompt": "people, objects, artifacts, seams",
+      "steps": 35,
+      "cfg_scale": 8.5
+    },
+    {
+      "name": "Background Replacement",
+      "positive_prompt": "professional studio backdrop, soft gradient, photography",
+      "negative_prompt": "harsh edges, seams, mismatched lighting",
+      "steps": 30,
+      "cfg_scale": 8.0
+    },
+    {
+      "name": "Face Correction",
+      "positive_prompt": "natural face, sharp features, correct anatomy, photorealistic skin",
+      "negative_prompt": "distorted, uncanny, asymmetric, blurry",
+      "steps": 40,
+      "cfg_scale": 9.0
+    }
+  ],
+
+  "changelog": {
+    "1.0.0": "Initial release - inpainting with mask editor support"
+  },
+
+  "license": "MIT",
+  "updated": "2025-01-28T20:00:00Z"
+}

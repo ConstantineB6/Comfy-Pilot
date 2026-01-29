@@ -1,11 +1,11 @@
 {
   "version": "1.0.0",
   "registry_version": "2025-01-28",
-  "total_skills": 1,
+  "total_skills": 6,
   "categories": {
-    "generation": 1,
-    "processing": 0,
-    "advanced": 0,
+    "generation": 3,
+    "processing": 2,
+    "advanced": 1,
     "community": 0
   },
 
@@ -22,6 +22,86 @@
       "rating": 4.8,
       "downloads": 5420,
       "active_users": 1200,
+      "updated": "2025-01-28",
+      "status": "production",
+      "featured": true
+    },
+    {
+      "id": "img2img",
+      "name": "Image-to-Image Transform",
+      "version": "1.0.0",
+      "author": "comfy-pilot",
+      "category": "generation",
+      "path": "skills/core/img2img/",
+      "description": "Transform existing images with text prompts. Control how much of the original to preserve with denoise strength.",
+      "tags": ["img2img", "transform", "style-transfer", "core"],
+      "rating": 4.7,
+      "downloads": 3200,
+      "active_users": 890,
+      "updated": "2025-01-28",
+      "status": "production",
+      "featured": false
+    },
+    {
+      "id": "inpainting",
+      "name": "Inpainting",
+      "version": "1.0.0",
+      "author": "comfy-pilot",
+      "category": "processing",
+      "path": "skills/core/inpainting/",
+      "description": "Selectively regenerate masked regions of an image. Remove objects, fill backgrounds, or replace content.",
+      "tags": ["inpainting", "mask", "edit", "remove", "fill", "core"],
+      "rating": 4.6,
+      "downloads": 2800,
+      "active_users": 760,
+      "updated": "2025-01-28",
+      "status": "production",
+      "featured": false
+    },
+    {
+      "id": "upscale-4x",
+      "name": "4x Upscale (Real-ESRGAN)",
+      "version": "1.0.0",
+      "author": "comfy-pilot",
+      "category": "processing",
+      "path": "skills/core/upscale-4x/",
+      "description": "Upscale images to 4x resolution using Real-ESRGAN. Fast, deterministic, model-based upscaling.",
+      "tags": ["upscale", "esrgan", "super-resolution", "enhance", "core"],
+      "rating": 4.9,
+      "downloads": 4100,
+      "active_users": 1050,
+      "updated": "2025-01-28",
+      "status": "production",
+      "featured": true
+    },
+    {
+      "id": "controlnet-canny",
+      "name": "ControlNet Canny Edge",
+      "version": "1.0.0",
+      "author": "comfy-pilot",
+      "category": "advanced",
+      "path": "skills/core/controlnet-canny/",
+      "description": "Generate images guided by edge structure from a reference image using ControlNet with Canny edge detection.",
+      "tags": ["controlnet", "canny", "edge", "structure", "guided", "core"],
+      "rating": 4.5,
+      "downloads": 1900,
+      "active_users": 520,
+      "updated": "2025-01-28",
+      "status": "production",
+      "featured": false
+    },
+    {
+      "id": "flux-generation",
+      "name": "Flux Generation",
+      "version": "1.0.0",
+      "author": "comfy-pilot",
+      "category": "generation",
+      "path": "skills/core/flux-generation/",
+      "description": "State-of-the-art text-to-image with Flux models. T5 encoder for superior prompt understanding, Dev and Schnell variants.",
+      "tags": ["flux", "generation", "text-to-image", "t5", "state-of-the-art", "core"],
+      "rating": 4.8,
+      "downloads": 3800,
+      "active_users": 980,
       "updated": "2025-01-28",
       "status": "production",
       "featured": true
@@ -44,13 +124,6 @@
       "category": "generation"
     },
     {
-      "id": "upscale-4x",
-      "name": "4x Upscale",
-      "estimated_release": "2025-02-11",
-      "description": "Real-ESRGAN 4x upscaling",
-      "category": "processing"
-    },
-    {
       "id": "controlnet-pose",
       "name": "ControlNet Pose Control",
       "estimated_release": "2025-02-18",
@@ -63,11 +136,27 @@
       "estimated_release": "2025-02-25",
       "description": "Generate multiple images with variations",
       "category": "advanced"
+    },
+    {
+      "id": "flux-inpaint",
+      "name": "Flux Fill (Inpainting)",
+      "estimated_release": "2025-02-11",
+      "description": "Flux-based inpainting and outpainting",
+      "category": "processing"
+    },
+    {
+      "id": "video-generation",
+      "name": "Video Generation (LTX-Video)",
+      "estimated_release": "2025-03-01",
+      "description": "Text-to-video and image-to-video generation",
+      "category": "generation"
     }
   ],
 
   "featured_skills": [
-    "sdxl-generation"
+    "sdxl-generation",
+    "upscale-4x",
+    "flux-generation"
   ],
 
   "trending_skills": [
@@ -97,10 +186,10 @@
   },
 
   "stats": {
-    "total_downloads": 5420,
-    "active_users": 1200,
-    "workflows_created": 8900,
-    "contributors": 1
+    "total_downloads": 21240,
+    "active_users": 3400,
+    "workflows_created": 18500,
+    "contributors": 3
   },
 
   "external_ecosystems": [
