@@ -151,8 +151,19 @@ Claude will use `download_model` to download from Hugging Face to your ComfyUI m
 
 Install Claude Code CLI:
 
+**macOS / Linux / WSL:**
 ```bash
-npm install -g @anthropic-ai/claude-code
+curl -fsSL https://claude.ai/install.sh | bash
+```
+
+**Windows (PowerShell):**
+```powershell
+irm https://claude.ai/install.ps1 | iex
+```
+
+**Windows (CMD):**
+```cmd
+curl -fsSL https://claude.ai/install.cmd -o install.cmd && install.cmd && del install.cmd
 ```
 
 ### MCP server not connecting

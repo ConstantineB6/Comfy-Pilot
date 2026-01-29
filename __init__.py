@@ -114,20 +114,40 @@ def is_claude_installed():
 def install_claude_code():
     """Attempt to install Claude Code CLI. Returns (success, message)."""
     import subprocess
+    import platform
 
-    # Check if npm is available
-    npm_path = find_executable("npm")
-    if npm_path is None:
-        return False, "npm not found. Please install Node.js first: https://nodejs.org/"
+    system = platform.system().lower()
 
     try:
-        print(f"[Claude Code] Installing Claude Code CLI using {npm_path}...")
-        result = subprocess.run(
-            [npm_path, "install", "-g", "@anthropic-ai/claude-code"],
-            capture_output=True,
-            text=True,
-            timeout=120
-        )
+        if system == "windows":
+            # Check if running in PowerShell or CMD
+            # Try PowerShell first (more common)
+            print("[Claude Code] Installing Claude Code CLI via PowerShell...")
+            result = subprocess.run(
+                ["powershell", "-Command", "irm https://claude.ai/install.ps1 | iex"],
+                capture_output=True,
+                text=True,
+                timeout=120
+            )
+            if result.returncode != 0:
+                # Fallback to CMD method
+                print("[Claude Code] PowerShell failed, trying CMD...")
+                result = subprocess.run(
+                    ["cmd", "/c", "curl -fsSL https://claude.ai/install.cmd -o install.cmd && install.cmd && del install.cmd"],
+                    capture_output=True,
+                    text=True,
+                    timeout=120
+                )
+        else:
+            # macOS, Linux, WSL - use the shell script
+            print("[Claude Code] Installing Claude Code CLI...")
+            result = subprocess.run(
+                ["bash", "-c", "curl -fsSL https://claude.ai/install.sh | bash"],
+                capture_output=True,
+                text=True,
+                timeout=120
+            )
+
         if result.returncode == 0:
             print("[Claude Code] Claude Code CLI installed successfully!")
             return True, "Claude Code CLI installed successfully!"
