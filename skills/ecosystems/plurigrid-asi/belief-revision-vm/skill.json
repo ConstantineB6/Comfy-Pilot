@@ -1,0 +1,44 @@
+{
+  "id": "belief-revision-vm",
+  "name": "Belief Revision VM (DuckDB ACSet × boxxy)",
+  "version": "1.0.0",
+  "author": "plurigrid",
+  "category": "scientific",
+  "trit": 0,
+  "trit_name": "ZERO",
+  "color": "#91BE25",
+  "description": "Belief revision over VM states using DuckDB ACSet. Interleaves cognitive science tables from history.duckdb (phase_transitions, markov_blanket, reafference_loop, strange_loop_cycle) with boxxy's belief revision system and vz/ memory snapshots for branching world exploration.",
+  "tags": ["belief-revision", "acset", "duckdb", "cognitive-science", "snapshots", "branching"],
+  "provenance": {
+    "ducklake_tables": [
+      "lake.cognitive_glue",
+      "lake.markov_blanket",
+      "lake.phase_transitions",
+      "lake.reafference_loop",
+      "lake.rec2020_gamut",
+      "lake.stigmergy_evolution",
+      "lake.strange_loop_cycle"
+    ],
+    "boxxy_module": "internal/belief/acset.go",
+    "duckdb_file": "belief_revision.duckdb"
+  },
+  "interleaving": {
+    "ducklake_pattern": "7 cognitive science tables materialized in DuckLake, queryable via SQL",
+    "boxxy_pattern": "BeliefSet + EpistemicEntrenchment + RevisionOp backed by DuckDB ACSet",
+    "synthesis": "VM memory snapshots as belief states — branching creates epistemic alternatives, Grove spheres map to snapshot trees"
+  },
+  "examples": {
+    "ducklake_phase_transitions": {
+      "description": "Query phase transitions from DuckLake",
+      "sql": "SELECT regime, state_name, harmonic_regime, order_param, beta\nFROM lake.phase_transitions\nORDER BY beta;"
+    },
+    "ducklake_strange_loop": {
+      "description": "Strange loop cycle showing self-reference structure",
+      "sql": "SELECT step, structure, morphism, operation\nFROM lake.strange_loop_cycle\nORDER BY step;"
+    },
+    "boxxy_belief_snapshot": {
+      "description": "VM snapshot as belief state with branching",
+      "code": ";; Boot a VM, snapshot it, branch into alternative beliefs\n(def boot (vz/new-linux-boot-loader \"vmlinuz\" \"initrd\" \"root=/dev/vda\"))\n(def cfg (vz/new-vm-config 2 4 boot (vz/new-generic-platform)))\n(def vm (vz/new-vm cfg))\n(vz/start-vm! vm)\n\n;; Snapshot = belief state B₀\n;; (vz capabilities: memory-snapshots true, max-branches 16)\n;; Each branch is an epistemic alternative\n;; Grove sphere levels map to snapshot depth\n\n(println \"VM state:\" (vz/vm-state vm))\n(println \"Branching: up to 16 simultaneous belief worlds\")\n(println \"Pause/resume: suspend belief, explore alternative\")\n(vz/pause-vm! vm)\n(println \"Paused:\" (vz/vm-state vm))\n(vz/resume-vm! vm)\n(println \"Resumed:\" (vz/vm-state vm))"
+    }
+  }
+}

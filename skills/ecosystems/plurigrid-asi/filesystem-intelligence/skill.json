@@ -1,0 +1,50 @@
+{
+  "id": "filesystem-intelligence",
+  "name": "Filesystem Intelligence (babashka.fs → boxxy)",
+  "version": "1.0.0",
+  "author": "plurigrid",
+  "category": "exploration",
+  "trit": 1,
+  "trit_name": "PLUS",
+  "color": "#0BC68E",
+  "description": "Codebase exploration via Lisp filesystem primitives. Interleaves babashka.fs glob/exists?/create-dirs patterns (122 observed calls) with babashka slurp file reading (143 calls) and boxxy equivalents for VM-internal filesystem access.",
+  "tags": ["filesystem", "exploration", "glob", "slurp", "babashka", "boxxy"],
+  "provenance": {
+    "ducklake_query": "SELECT * FROM lake.babashka_usage WHERE usage_category IN ('filesystem', 'file-read', 'file-write')",
+    "observed_calls": 360,
+    "breakdown": {
+      "file-read": 143,
+      "filesystem": 122,
+      "file-write": 95
+    },
+    "projects": ["-Users-bob-i", "-Users-bob-ies"]
+  },
+  "interleaving": {
+    "babashka_patterns": [
+      "(println (slurp \"/path/to/file\"))",
+      "(require '[babashka.fs :as fs]) (fs/glob \"/dir\" \"**/*.edn\")",
+      "(fs/create-dirs \"/path/to/new\")",
+      "(spit \"/path\" content)"
+    ],
+    "boxxy_pattern": "boxxy reads EDN natively via its reader, filesystem access through vz/ volume mounts or direct host I/O",
+    "advantage": "boxxy's reader IS the filesystem intelligence — EDN files are code, code is data, the evaluator understands the shape"
+  },
+  "examples": {
+    "babashka_slurp_tree": {
+      "description": "Directory tree exploration (most common observed pattern)",
+      "code": "(require '[babashka.fs :as fs])\n\n(defn tree [dir depth]\n  (when (and (fs/exists? dir) (pos? depth))\n    (let [files (sort (fs/list-dir dir))]\n      (doseq [f files]\n        (println (str (apply str (repeat (- 3 depth) \"  \")) (fs/file-name f)))\n        (when (fs/directory? f)\n          (tree f (dec depth)))))))\n\n(tree \"/Users/bob/i/boxxy\" 3)"
+    },
+    "babashka_glob_edn": {
+      "description": "Find and read all EDN configs",
+      "code": "(require '[babashka.fs :as fs])\n\n(doseq [f (fs/glob \"/Users/bob/i\" \"**/*.edn\")]\n  (println (str f))\n  (println (slurp (str f)))\n  (println \"---\"))"
+    },
+    "babashka_write_b64": {
+      "description": "Write files with Base64 encoding (observed 7x in session 15dcff1d)",
+      "code": "(require '[babashka.fs :as fs])\n(import '[java.util Base64])\n\n(defn write-b64 [path content-b64]\n  (let [decoder (Base64/getDecoder)\n        bytes (.decode decoder content-b64)]\n    (fs/create-dirs (fs/parent path))\n    (java.io.FileOutputStream. (str path) false)\n    (println \"Wrote\" (count bytes) \"bytes to\" path)))"
+    },
+    "boxxy": {
+      "description": "boxxy metacircular: EDN IS the filesystem intelligence",
+      "code": ";; boxxy doesn't need babashka.fs — the reader IS the intelligence\n;; provider.edn is both data AND the VM specification\n\n(def provider (quote\n  {:provider/name \"boxxy\"\n   :capabilities {:memory-snapshots true :branching true}\n   :vz/namespace {:boot-loaders [{:name :vz/new-linux-boot-loader}]}}))\n\n;; The evaluator walks the data structure\n(println \"Provider:\" (get provider :provider/name))\n(println \"Snapshots:\" (get (get provider :capabilities) :memory-snapshots))\n\n;; Disk images ARE the filesystem\n(vz/create-disk-image \"/tmp/exploration.img\" 2)\n(def disk (vz/new-disk-attachment \"/tmp/exploration.img\" false))\n(println \"Disk attached — boxxy reads through the VM, not around it\")"
+    }
+  }
+}

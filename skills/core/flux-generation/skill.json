@@ -1,0 +1,174 @@
+{
+  "id": "flux-generation",
+  "name": "Flux Generation",
+  "version": "1.0.0",
+  "author": "comfy-pilot",
+  "description": "Generate images with Flux models (Dev, Schnell). State-of-the-art text-to-image with T5 text encoder for superior prompt understanding.",
+  "category": "generation",
+  "tags": ["flux", "generation", "text-to-image", "t5", "state-of-the-art", "core"],
+  "repository": "https://github.com/ConstantineB6/Comfy-Pilot/tree/main/skills/core/flux-generation",
+
+  "metadata": {
+    "comfyui_min_version": "0.1.0",
+    "python_min_version": "3.10",
+    "dependencies": ["comfyui_core"],
+    "supported_models": [
+      "flux1-dev.safetensors",
+      "flux1-schnell.safetensors",
+      "flux1-dev-fp8.safetensors"
+    ],
+    "stability": "production",
+    "maintenance_status": "active"
+  },
+
+  "inputs": {
+    "unet_model": {
+      "type": "string",
+      "description": "Flux diffusion model",
+      "default": "flux1-dev.safetensors",
+      "required": true,
+      "options": [
+        "flux1-dev.safetensors",
+        "flux1-schnell.safetensors",
+        "flux1-dev-fp8.safetensors"
+      ],
+      "notes": "Dev for quality, Schnell for speed (4 steps). Place in models/diffusion_models/"
+    },
+    "weight_dtype": {
+      "type": "string",
+      "description": "Model precision for VRAM optimization",
+      "default": "fp8_e4m3fn",
+      "options": ["default", "fp8_e4m3fn", "fp8_e5m2"],
+      "notes": "fp8 halves VRAM usage with minimal quality loss"
+    },
+    "clip_name1": {
+      "type": "string",
+      "description": "CLIP-L text encoder",
+      "default": "clip_l.safetensors",
+      "notes": "Place in models/text_encoders/"
+    },
+    "clip_name2": {
+      "type": "string",
+      "description": "T5-XXL text encoder (enables superior prompt understanding)",
+      "default": "t5xxl_fp8_e4m3fn.safetensors",
+      "notes": "fp8 version recommended to save VRAM"
+    },
+    "vae_name": {
+      "type": "string",
+      "description": "Flux VAE",
+      "default": "ae.safetensors",
+      "notes": "Place in models/vae/"
+    },
+    "prompt": {
+      "type": "string",
+      "description": "Text prompt - Flux excels at natural language descriptions",
+      "required": true,
+      "examples": [
+        "a puffin standing on a cliff overlooking the ocean at golden hour, photorealistic",
+        "a hand-drawn sketch of a cat sitting in a window, pencil on paper, artistic"
+      ],
+      "notes": "No negative prompt needed - Flux uses guidance scale instead"
+    },
+    "guidance": {
+      "type": "number",
+      "description": "Flux guidance strength (replaces CFG)",
+      "default": 3.5,
+      "min": 1.0,
+      "max": 10.0,
+      "notes": "3.5 is recommended default. Lower = more creative, higher = more literal"
+    },
+    "steps": {
+      "type": "integer",
+      "description": "Sampling steps",
+      "default": 20,
+      "min": 1,
+      "max": 50,
+      "notes": "Dev: 20-30 steps. Schnell: 4 steps."
+    },
+    "width": {
+      "type": "integer",
+      "description": "Output width",
+      "default": 1024,
+      "min": 512,
+      "max": 2048,
+      "step": 64
+    },
+    "height": {
+      "type": "integer",
+      "description": "Output height",
+      "default": 1024,
+      "min": 512,
+      "max": 2048,
+      "step": 64
+    },
+    "seed": {
+      "type": "integer",
+      "description": "Random seed",
+      "default": -1
+    }
+  },
+
+  "outputs": {
+    "image": {
+      "type": "image",
+      "description": "Generated image",
+      "format": "RGBA",
+      "resolution": "variable"
+    }
+  },
+
+  "performance": {
+    "estimated_time_seconds": 30,
+    "estimated_vram_gb": 12,
+    "estimated_ram_gb": 8,
+    "device": "nvidia_gpu_recommended",
+    "notes": "fp8 models need ~12GB VRAM. Full precision needs ~24GB. Schnell at 4 steps is ~5s on RTX 4090."
+  },
+
+  "nodes_created": [
+    "UNETLoader",
+    "DualCLIPLoader",
+    "VAELoader",
+    "CLIPTextEncode",
+    "EmptySD3LatentImage",
+    "FluxGuidance",
+    "KSampler",
+    "VAEDecode",
+    "PreviewImage"
+  ],
+
+  "examples": [
+    {
+      "name": "Photorealistic Landscape",
+      "prompt": "a puffin standing on a cliff overlooking the ocean at golden hour, photorealistic, 8k, natural lighting",
+      "guidance": 3.5,
+      "steps": 20,
+      "width": 1280,
+      "height": 768
+    },
+    {
+      "name": "Artistic Illustration",
+      "prompt": "a hand-drawn sketch of a cat sitting in a window, pencil on paper, artistic, detailed hatching",
+      "guidance": 4.0,
+      "steps": 25,
+      "width": 1024,
+      "height": 1024
+    },
+    {
+      "name": "Fast Generation (Schnell)",
+      "prompt": "cyberpunk cityscape at night, neon lights reflecting on wet streets, cinematic",
+      "unet_model": "flux1-schnell.safetensors",
+      "guidance": 3.5,
+      "steps": 4,
+      "width": 1024,
+      "height": 1024
+    }
+  ],
+
+  "changelog": {
+    "1.0.0": "Initial release - Flux Dev and Schnell support with fp8"
+  },
+
+  "license": "MIT",
+  "updated": "2025-01-28T20:00:00Z"
+}

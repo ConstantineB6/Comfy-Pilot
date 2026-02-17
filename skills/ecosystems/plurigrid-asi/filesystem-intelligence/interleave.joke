@@ -1,0 +1,64 @@
+#!/usr/bin/env boxxy
+;; filesystem-intelligence/interleave.joke
+;;
+;; 360 babashka calls for filesystem operations:
+;;   143 file-read (slurp)
+;;   122 filesystem (babashka.fs glob/exists?/create-dirs)
+;;    95 file-write (spit/io/writer)
+;;
+;; boxxy's insight: EDN files ARE code. The reader IS the filesystem
+;; intelligence. You don't read a config and then process it —
+;; you evaluate it.
+
+(println "╔═══════════════════════════════════════════════════╗")
+(println "║  Filesystem Intelligence: babashka → boxxy        ║")
+(println "║  360 observed calls → metacircular EDN reading    ║")
+(println "╚═══════════════════════════════════════════════════╝")
+(println)
+
+;; ── What babashka did 143 times ──────────────────────────────
+;; (println (slurp "/Users/bob/i/containers/inventory.edn"))
+;; (println (slurp "/Users/bob/i/containers/README.md"))
+;; (println (slurp "/path/to/any/file"))
+;;
+;; Just... printing file contents. 143 times.
+
+;; ── What babashka did 122 times ──────────────────────────────
+;; (require '[babashka.fs :as fs])
+;; (doseq [f (fs/glob "/dir" "**/*.edn")] (println f))
+;; (fs/create-dirs "/new/path")
+;; (fs/exists? "/path")
+;;
+;; Querying the filesystem shape.
+
+;; ── What boxxy does ──────────────────────────────────────────
+;; The provider.edn IS the system description.
+;; Reading it IS understanding it.
+
+(def vm-sizes
+  {:small    {:cpus 1  :memory-gb 1  :label "Micro"}
+   :medium   {:cpus 2  :memory-gb 2  :label "Small"}
+   :large    {:cpus 4  :memory-gb 4  :label "Medium"}
+   :xlarge   {:cpus 4  :memory-gb 8  :label "Large"}
+   :2xlarge  {:cpus 8  :memory-gb 16 :label "XL"}})
+
+;; This IS the filesystem intelligence:
+;; the data describes what VMs can be created
+(println "Available VM sizes:")
+(println "  small:   " (get (get vm-sizes :small) :label)
+         " — " (get (get vm-sizes :small) :cpus) "CPU,"
+         (get (get vm-sizes :small) :memory-gb) "GB")
+(println "  xlarge:  " (get (get vm-sizes :xlarge) :label)
+         " — " (get (get vm-sizes :xlarge) :cpus) "CPU,"
+         (get (get vm-sizes :xlarge) :memory-gb) "GB")
+(println "  2xlarge: " (get (get vm-sizes :2xlarge) :label)
+         " — " (get (get vm-sizes :2xlarge) :cpus) "CPU,"
+         (get (get vm-sizes :2xlarge) :memory-gb) "GB")
+
+(println)
+(println "babashka reads files to learn about the system.")
+(println "boxxy IS the system that the files describe.")
+(println "The evaluator reads provider.edn.")
+(println "provider.edn describes the evaluator.")
+(println "There is no file. There is no filesystem.")
+(println "There is only eval/apply.")

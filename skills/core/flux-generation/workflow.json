@@ -1,0 +1,150 @@
+{
+  "nodes": [
+    {
+      "id": 30,
+      "type": "UNETLoader",
+      "pos": [100, 100],
+      "size": [300, 80],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "outputs": [
+        {"name": "MODEL", "type": "MODEL", "links": [100], "slot_index": 0}
+      ],
+      "title": "Load Flux Model",
+      "properties": {},
+      "widgets_values": ["flux1-dev.safetensors", "fp8_e4m3fn"]
+    },
+    {
+      "id": 31,
+      "type": "DualCLIPLoader",
+      "pos": [100, 260],
+      "size": [300, 80],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "outputs": [
+        {"name": "CLIP", "type": "CLIP", "links": [101], "slot_index": 0}
+      ],
+      "title": "Load CLIP + T5",
+      "properties": {},
+      "widgets_values": ["clip_l.safetensors", "t5xxl_fp8_e4m3fn.safetensors", "flux"]
+    },
+    {
+      "id": 32,
+      "type": "VAELoader",
+      "pos": [100, 420],
+      "size": [300, 60],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "outputs": [
+        {"name": "VAE", "type": "VAE", "links": [102], "slot_index": 0}
+      ],
+      "title": "Load VAE",
+      "properties": {},
+      "widgets_values": ["ae.safetensors"]
+    },
+    {
+      "id": 6,
+      "type": "CLIPTextEncode",
+      "pos": [420, 100],
+      "size": [350, 140],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "outputs": [
+        {"name": "CONDITIONING", "type": "CONDITIONING", "links": [16], "slot_index": 0}
+      ],
+      "title": "Prompt",
+      "properties": {},
+      "widgets_values": ["a puffin standing on a cliff overlooking the ocean at golden hour, photorealistic, 8k"]
+    },
+    {
+      "id": 5,
+      "type": "EmptySD3LatentImage",
+      "pos": [420, 320],
+      "size": [260, 80],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "outputs": [
+        {"name": "LATENT", "type": "LATENT", "links": [60], "slot_index": 0}
+      ],
+      "title": "Empty Latent",
+      "properties": {},
+      "widgets_values": [1024, 1024, 1]
+    },
+    {
+      "id": 33,
+      "type": "FluxGuidance",
+      "pos": [420, 470],
+      "size": [260, 60],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "outputs": [
+        {"name": "CONDITIONING", "type": "CONDITIONING", "links": [103], "slot_index": 0}
+      ],
+      "title": "Flux Guidance",
+      "properties": {},
+      "widgets_values": [3.5]
+    },
+    {
+      "id": 3,
+      "type": "KSampler",
+      "pos": [800, 140],
+      "size": [300, 260],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "outputs": [
+        {"name": "LATENT", "type": "LATENT", "links": [2], "slot_index": 0}
+      ],
+      "title": "Sampler",
+      "properties": {},
+      "widgets_values": [-1, "fixed", 20, 1.0, "euler", "simple", 1.0, false]
+    },
+    {
+      "id": 8,
+      "type": "VAEDecode",
+      "pos": [1120, 140],
+      "size": [210, 46],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "outputs": [
+        {"name": "IMAGE", "type": "IMAGE", "links": [3], "slot_index": 0}
+      ],
+      "title": "Decode",
+      "properties": {},
+      "widgets_values": []
+    },
+    {
+      "id": 9,
+      "type": "PreviewImage",
+      "pos": [1340, 140],
+      "size": [210, 58],
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "title": "Preview",
+      "properties": {},
+      "widgets_values": []
+    }
+  ],
+  "links": [
+    [2, 3, 0, 8, 0, "LATENT"],
+    [3, 8, 0, 9, 0, "IMAGE"],
+    [16, 6, 0, 33, 0, "CONDITIONING"],
+    [60, 5, 0, 3, 3, "LATENT"],
+    [100, 30, 0, 3, 0, "MODEL"],
+    [101, 31, 0, 6, 0, "CLIP"],
+    [102, 32, 0, 8, 1, "VAE"],
+    [103, 33, 0, 3, 1, "CONDITIONING"]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {},
+  "version": 0.4
+}

@@ -1,0 +1,140 @@
+{
+  "id": "img2img",
+  "name": "Image-to-Image Transform",
+  "version": "1.0.0",
+  "author": "comfy-pilot",
+  "description": "Transform existing images with text prompts. Control how much of the original to preserve with denoise strength.",
+  "category": "generation",
+  "tags": ["img2img", "transform", "style-transfer", "core"],
+  "repository": "https://github.com/ConstantineB6/Comfy-Pilot/tree/main/skills/core/img2img",
+
+  "metadata": {
+    "comfyui_min_version": "0.1.0",
+    "python_min_version": "3.8",
+    "dependencies": ["comfyui_core"],
+    "supported_models": [
+      "sd_xl_base_1.0.safetensors",
+      "sd_xl_turbo.safetensors"
+    ],
+    "stability": "production",
+    "maintenance_status": "active"
+  },
+
+  "inputs": {
+    "checkpoint_name": {
+      "type": "string",
+      "description": "Model checkpoint to load",
+      "default": "sd_xl_base_1.0.safetensors",
+      "required": true
+    },
+    "input_image": {
+      "type": "string",
+      "description": "Path to input image (place in ComfyUI input folder)",
+      "required": true,
+      "examples": ["photo.png", "sketch.jpg"]
+    },
+    "positive_prompt": {
+      "type": "string",
+      "description": "Text describing desired transformation",
+      "required": true,
+      "examples": [
+        "oil painting style, vibrant colors, impressionist",
+        "cyberpunk neon aesthetic, digital art"
+      ]
+    },
+    "negative_prompt": {
+      "type": "string",
+      "description": "Text describing what to avoid",
+      "default": "blurry, low quality, distorted, artifacts"
+    },
+    "denoise": {
+      "type": "number",
+      "description": "How much to change the image (0.0 = no change, 1.0 = full regeneration)",
+      "default": 0.75,
+      "min": 0.0,
+      "max": 1.0,
+      "step": 0.05,
+      "notes": "0.3-0.5 for subtle changes, 0.6-0.8 for style transfer, 0.85+ for major transformation"
+    },
+    "steps": {
+      "type": "integer",
+      "description": "Number of sampling steps",
+      "default": 30,
+      "min": 1,
+      "max": 150
+    },
+    "cfg_scale": {
+      "type": "number",
+      "description": "How closely to follow the prompt",
+      "default": 7.5,
+      "min": 1.0,
+      "max": 30.0
+    },
+    "seed": {
+      "type": "integer",
+      "description": "Random seed (-1 for random)",
+      "default": -1
+    }
+  },
+
+  "outputs": {
+    "image": {
+      "type": "image",
+      "description": "Transformed image",
+      "format": "RGBA",
+      "resolution": "matches input"
+    }
+  },
+
+  "performance": {
+    "estimated_time_seconds": 40,
+    "estimated_vram_gb": 8,
+    "estimated_ram_gb": 4,
+    "device": "nvidia_gpu_recommended",
+    "notes": "Similar to txt2img. Lower denoise values are slightly faster."
+  },
+
+  "nodes_created": [
+    "CheckpointLoaderSimple",
+    "LoadImage",
+    "VAEEncode",
+    "CLIPTextEncode",
+    "KSampler",
+    "VAEDecode",
+    "PreviewImage"
+  ],
+
+  "examples": [
+    {
+      "name": "Style Transfer - Oil Painting",
+      "positive_prompt": "oil painting, thick brushstrokes, impressionist, vibrant warm colors",
+      "negative_prompt": "photorealistic, sharp, digital",
+      "denoise": 0.7,
+      "steps": 35,
+      "cfg_scale": 7.5
+    },
+    {
+      "name": "Sketch to Render",
+      "positive_prompt": "detailed architectural render, photorealistic, studio lighting, 8k",
+      "negative_prompt": "sketch, lines, rough, blurry",
+      "denoise": 0.85,
+      "steps": 40,
+      "cfg_scale": 8.0
+    },
+    {
+      "name": "Subtle Enhancement",
+      "positive_prompt": "professional photography, enhanced lighting, sharp details",
+      "negative_prompt": "blurry, low quality",
+      "denoise": 0.35,
+      "steps": 25,
+      "cfg_scale": 7.0
+    }
+  ],
+
+  "changelog": {
+    "1.0.0": "Initial release - img2img with denoise control"
+  },
+
+  "license": "MIT",
+  "updated": "2025-01-28T20:00:00Z"
+}

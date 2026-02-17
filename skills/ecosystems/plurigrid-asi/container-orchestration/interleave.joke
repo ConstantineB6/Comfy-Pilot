@@ -1,0 +1,111 @@
+#!/usr/bin/env boxxy
+;; container-orchestration/interleave.joke
+;;
+;; The most impressive babashka session (15dcff1d) managed Apple Containers:
+;;   neo4j-local, jaeger, isabelle — via shell {:out :string} wrapping
+;;
+;; This file shows how boxxy does the same thing natively via vz/
+;; No subprocess spawning, no string parsing, no {:continue true} error handling
+;;
+;; GF(3) trit: 2 (MINUS - validation/infrastructure)
+;; Color: #1533EA (depth-2, instance)
+
+(println "╔═══════════════════════════════════════════════════╗")
+(println "║  Container Orchestration: babashka → boxxy        ║")
+(println "║  19 observed calls → native vz/ namespace         ║")
+(println "╚═══════════════════════════════════════════════════╝")
+(println)
+
+;; ── What babashka did (observed in DuckLake) ─────────────────
+;;
+;; (require '[babashka.process :refer [shell]])
+;; (shell {:out :string :err :string :continue true}
+;;        "container" "start" "neo4j-local")
+;; (shell {:out :string :err :string :continue true}
+;;        "container" "start" "jaeger")
+;; (shell {:out :string :err :string :continue true}
+;;        "container" "exec" "isabelle"
+;;        "/home/isabelle/Isabelle/bin/isabelle" "version")
+;;
+;; 19 calls, all shell wrappers, string parsing exit codes
+
+;; ── What boxxy does (native) ─────────────────────────────────
+
+;; 1. Neo4j — graph database for MCP
+(println "=== Neo4j VM ===")
+(def neo4j-boot (vz/new-linux-boot-loader
+  "neo4j/vmlinuz" "neo4j/initrd"
+  "console=hvc0 root=/dev/vda rw"))
+(def neo4j-cfg (vz/new-vm-config 2 4
+  neo4j-boot (vz/new-generic-platform)))
+
+;; Storage: persistent data volume
+(def neo4j-data (vz/new-disk-attachment "neo4j-data.img" false))
+(vz/add-storage-devices neo4j-cfg
+  [(vz/new-virtio-block-device neo4j-data)])
+
+;; Network: NAT for bolt://localhost:7687
+(vz/add-network-devices neo4j-cfg
+  [(vz/new-virtio-network (vz/new-nat-network))])
+
+(if (vz/validate-config neo4j-cfg)
+  (do
+    (def neo4j (vz/new-vm neo4j-cfg))
+    (vz/start-vm! neo4j)
+    (println "  Neo4j:" (vz/vm-state neo4j)))
+  (println "  Neo4j config invalid"))
+
+;; 2. Jaeger — distributed tracing
+(println "=== Jaeger VM ===")
+(def jaeger-boot (vz/new-linux-boot-loader
+  "jaeger/vmlinuz" "jaeger/initrd"
+  "console=hvc0 root=/dev/vda rw"))
+(def jaeger-cfg (vz/new-vm-config 1 2
+  jaeger-boot (vz/new-generic-platform)))
+
+(vz/add-storage-devices jaeger-cfg
+  [(vz/new-virtio-block-device
+     (vz/new-disk-attachment "jaeger-data.img" false))])
+(vz/add-network-devices jaeger-cfg
+  [(vz/new-virtio-network (vz/new-nat-network))])
+
+(if (vz/validate-config jaeger-cfg)
+  (do
+    (def jaeger (vz/new-vm jaeger-cfg))
+    (vz/start-vm! jaeger)
+    (println "  Jaeger:" (vz/vm-state jaeger)))
+  (println "  Jaeger config invalid"))
+
+;; 3. Isabelle — theorem prover (the hard one)
+;;    babashka needed 7 attempts: create, start, fix memory, recreate,
+;;    test proofs, debug ML platform, check Scala CLI
+;;    boxxy: one config, validated before starting
+(println "=== Isabelle VM (4 CPU, 8GB — learned from babashka failures) ===")
+(def isa-boot (vz/new-linux-boot-loader
+  "isabelle/vmlinuz" "isabelle/initrd"
+  "console=hvc0 root=/dev/vda rw init=/sbin/init"))
+(def isa-cfg (vz/new-vm-config 4 8
+  isa-boot (vz/new-generic-platform)))
+
+(vz/add-storage-devices isa-cfg
+  [(vz/new-virtio-block-device
+     (vz/new-disk-attachment "isabelle-root.img" false))])
+(vz/add-network-devices isa-cfg
+  [(vz/new-virtio-network (vz/new-nat-network))])
+
+;; Validate BEFORE starting (babashka discovered this the hard way)
+(if (vz/validate-config isa-cfg)
+  (do
+    (def isabelle (vz/new-vm isa-cfg))
+    (vz/start-vm! isabelle)
+    (println "  Isabelle:" (vz/vm-state isabelle))
+    (println "  Ready for: isabelle version, isabelle build -b HOL"))
+  (println "  Isabelle config invalid — check memory/CPU allocation"))
+
+(println)
+(println "All VMs started. boxxy advantage over babashka:")
+(println "  - No subprocess spawning (direct Virtualization.framework)")
+(println "  - No string parsing of exit codes")
+(println "  - Config validation before start (not after failure)")
+(println "  - Memory snapshots & branching (max-branches: 16)")
+(println "  - Pause/resume without container CLI")

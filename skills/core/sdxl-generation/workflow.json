@@ -1,0 +1,151 @@
+{
+  "nodes": [
+    {
+      "id": 4,
+      "type": "CheckpointLoaderSimple",
+      "pos": [100, 100],
+      "size": [300, 60],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [14],
+          "slot_index": 0
+        },
+        {
+          "name": "CLIP",
+          "type": "CLIP",
+          "links": [12, 13],
+          "slot_index": 1
+        },
+        {
+          "name": "VAE",
+          "type": "VAE",
+          "links": [15],
+          "slot_index": 2
+        }
+      ],
+      "title": "Load Checkpoint",
+      "properties": {},
+      "widgets_values": ["sd_xl_base_1.0.safetensors"]
+    },
+    {
+      "id": 6,
+      "type": "CLIPTextEncode",
+      "pos": [420, 100],
+      "size": [300, 120],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "outputs": [
+        {
+          "name": "CONDITIONING",
+          "type": "CONDITIONING",
+          "links": [16],
+          "slot_index": 0
+        }
+      ],
+      "title": "Positive Prompt",
+      "properties": {},
+      "widgets_values": ["professional portrait, studio lighting"]
+    },
+    {
+      "id": 7,
+      "type": "CLIPTextEncode",
+      "pos": [420, 250],
+      "size": [300, 120],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "outputs": [
+        {
+          "name": "CONDITIONING",
+          "type": "CONDITIONING",
+          "links": [17],
+          "slot_index": 0
+        }
+      ],
+      "title": "Negative Prompt",
+      "properties": {},
+      "widgets_values": ["blurry, low quality, distorted, artifacts, bad anatomy"]
+    },
+    {
+      "id": 3,
+      "type": "KSampler",
+      "pos": [740, 140],
+      "size": [300, 260],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "outputs": [
+        {
+          "name": "LATENT",
+          "type": "LATENT",
+          "links": [2],
+          "slot_index": 0
+        }
+      ],
+      "title": "Sampler",
+      "properties": {},
+      "widgets_values": [
+        -1,
+        "fixed",
+        30,
+        8.0,
+        "dpmpp_2m",
+        "normal",
+        1.0,
+        false
+      ]
+    },
+    {
+      "id": 8,
+      "type": "VAEDecode",
+      "pos": [1060, 140],
+      "size": [210, 46],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [3],
+          "slot_index": 0
+        }
+      ],
+      "title": "Decode",
+      "properties": {},
+      "widgets_values": []
+    },
+    {
+      "id": 9,
+      "type": "PreviewImage",
+      "pos": [1280, 140],
+      "size": [210, 58],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "title": "Preview",
+      "properties": {},
+      "widgets_values": []
+    }
+  ],
+  "links": [
+    [2, 3, 0, 8, 0, "LATENT"],
+    [3, 8, 0, 9, 0, "IMAGE"],
+    [12, 4, 1, 6, 0, "CLIP"],
+    [13, 4, 1, 7, 0, "CLIP"],
+    [14, 4, 0, 3, 0, "MODEL"],
+    [15, 4, 2, 8, 1, "VAE"],
+    [16, 6, 0, 3, 1, "CONDITIONING"],
+    [17, 7, 0, 3, 2, "CONDITIONING"]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {},
+  "version": 0.4
+}

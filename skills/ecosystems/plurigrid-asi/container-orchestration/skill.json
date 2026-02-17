@@ -1,0 +1,33 @@
+{
+  "id": "container-orchestration",
+  "name": "Container Orchestration (babashka → boxxy)",
+  "version": "1.0.0",
+  "author": "plurigrid",
+  "category": "infrastructure",
+  "trit": 2,
+  "trit_name": "MINUS",
+  "color": "#1533EA",
+  "description": "Orchestrate Apple Containers from Lisp. Interleaves babashka shell orchestration (299 successful calls observed) with boxxy vz namespace for native Virtualization.framework access.",
+  "tags": ["containers", "apple", "virtualization", "babashka", "boxxy", "vz", "orchestration"],
+  "provenance": {
+    "ducklake_query": "SELECT * FROM lake.babashka_usage WHERE usage_category = 'apple-containers'",
+    "observed_calls": 19,
+    "observed_sessions": 3,
+    "source_sessions": ["15dcff1d-0ac7-4496-8964-2aa4d9e8791b"]
+  },
+  "interleaving": {
+    "babashka_pattern": "babashka.process/shell wrapping `container` CLI commands",
+    "boxxy_pattern": "Direct vz/ namespace calls to Virtualization.framework",
+    "advantage": "boxxy eliminates the CLI middleman - vz/new-vm-config directly creates VM configs as Lisp values, no string parsing"
+  },
+  "examples": {
+    "babashka": {
+      "description": "Container management via CLI wrapper (observed pattern)",
+      "code": "(require '[babashka.process :refer [shell]])\n\n(let [ls (shell {:out :string :err :string :continue true}\n                \"container\" \"list\" \"--all\")]\n  (println (:out ls)))\n\n(let [start (shell {:out :string :err :string :continue true}\n                   \"container\" \"start\" \"neo4j-local\")]\n  (println (if (zero? (:exit start))\n             (str \"Started: \" (:out start))\n             (str \"Error: \" (:err start)))))"
+    },
+    "boxxy": {
+      "description": "Native VM creation via vz/ namespace",
+      "code": ";; No CLI wrapping needed - vz/ talks directly to Virtualization.framework\n(def boot (vz/new-linux-boot-loader \"vmlinuz\" \"initrd\" \"console=hvc0\"))\n(def platform (vz/new-generic-platform))\n(def cfg (vz/new-vm-config 4 8 boot platform))\n\n;; Attach storage\n(def disk (vz/new-disk-attachment \"neo4j-data.img\" false))\n(vz/add-storage-devices cfg [(vz/new-virtio-block-device disk)])\n\n;; Network\n(vz/add-network-devices cfg [(vz/new-virtio-network (vz/new-nat-network))])\n\n;; Start\n(def vm (vz/new-vm cfg))\n(vz/start-vm! vm)\n(println \"State:\" (vz/vm-state vm))"
+    }
+  }
+}

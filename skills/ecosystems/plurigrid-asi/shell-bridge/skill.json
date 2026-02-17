@@ -1,0 +1,43 @@
+{
+  "id": "shell-bridge",
+  "name": "Shell Bridge (babashka.process → boxxy exec)",
+  "version": "1.0.0",
+  "author": "plurigrid",
+  "category": "infrastructure",
+  "trit": 2,
+  "trit_name": "MINUS",
+  "color": "#D822A5",
+  "description": "The dominant babashka pattern: 299 shell-exec calls wrapping system commands. Shows how boxxy replaces the shell-as-glue pattern with native VM exec, turning the most common babashka usage into first-class VM operations.",
+  "tags": ["shell", "process", "exec", "babashka", "boxxy", "bridge", "orchestration"],
+  "provenance": {
+    "ducklake_query": "SELECT * FROM lake.babashka_usage WHERE usage_category = 'shell-exec' ORDER BY ts",
+    "observed_calls": 299,
+    "observed_sessions": 26,
+    "top_commands": [
+      "container list/start/exec/create/rm",
+      "curl -s (health checks)",
+      "which (binary detection)",
+      "git operations",
+      "isabelle proof checking"
+    ]
+  },
+  "interleaving": {
+    "babashka_pattern": "(shell {:out :string :err :string :continue true} \"cmd\" \"args\")",
+    "boxxy_pattern": "vz/ namespace replaces shell for VM operations; host commands run via boxxy's own process bridge",
+    "key_insight": "babashka's 299 shell calls were overwhelmingly VM management — boxxy eliminates that entire class by making VMs first-class Lisp values"
+  },
+  "examples": {
+    "babashka_container_lifecycle": {
+      "description": "Full container lifecycle from session 15dcff1d (110 calls)",
+      "code": "(require '[babashka.process :refer [shell]])\n\n;; 1. Detect CLI\n(let [which (shell {:out :string :err :string :continue true} \"which\" \"container\")]\n  (println \"Binary:\" (clojure.string/trim (:out which))))\n\n;; 2. List existing\n(let [ls (shell {:out :string :err :string :continue true} \"container\" \"list\" \"--all\")]\n  (println (:out ls)))\n\n;; 3. Create (failed first time — 2GB not enough for Isabelle)\n(shell {:out :string :err :string :continue true}\n       \"container\" \"create\" \"--name\" \"isabelle\" \"--cpus\" \"4\" \"--memory\" \"2g\")\n\n;; 4. Delete and recreate with 4GB (learned from failure)\n(shell {:out :string :err :string :continue true} \"container\" \"rm\" \"isabelle\")\n(shell {:out :string :err :string :continue true}\n       \"container\" \"create\" \"--name\" \"isabelle\" \"--cpus\" \"4\" \"--memory\" \"4g\")\n\n;; 5. Start and test\n(shell {:out :string :err :string :continue true} \"container\" \"start\" \"isabelle\")\n(let [ver (shell {:out :string :err :string :continue true}\n                 \"container\" \"exec\" \"isabelle\"\n                 \"/home/isabelle/Isabelle/bin/isabelle\" \"version\")]\n  (println \"Isabelle:\" (:out ver)))"
+    },
+    "babashka_health_checks": {
+      "description": "Service health checking via curl (observed in network category)",
+      "code": "(require '[babashka.process :refer [shell]])\n\n;; Jaeger health\n(let [health (shell {:out :string :err :string :continue true}\n                    \"curl\" \"-s\" \"http://localhost:16686/api/services\")]\n  (println \"Jaeger services:\" (:out health)))\n\n;; Neo4j bolt\n(let [neo (shell {:out :string :err :string :continue true}\n                 \"curl\" \"-s\" \"http://localhost:7474\")]\n  (println \"Neo4j:\" (:out neo)))"
+    },
+    "boxxy_native": {
+      "description": "boxxy does all of this without shell wrapping",
+      "code": ";; boxxy replaces 299 shell calls with native operations\n;;\n;; Instead of: (shell {:continue true} \"container\" \"create\" ...)\n;; boxxy does: (vz/new-vm-config 4 8 boot platform)\n;;\n;; Instead of: (shell {:continue true} \"container\" \"start\" ...)\n;; boxxy does: (vz/start-vm! vm)\n;;\n;; Instead of: (shell {:continue true} \"container\" \"exec\" ...)\n;; boxxy does: direct I/O through virtio console\n;;\n;; Instead of: parsing {:exit 0 :out \"...\" :err \"...\"}\n;; boxxy returns: Lisp values (:running, :stopped, :paused)\n\n(def sizes\n  {:small  {:cpus 1 :memory-gb 1}\n   :medium {:cpus 2 :memory-gb 2}\n   :large  {:cpus 4 :memory-gb 4}\n   :xlarge {:cpus 4 :memory-gb 8}})\n\n(def isabelle-size (get sizes :xlarge))\n\n(println \"Isabelle config:\")\n(println \"  CPUs:\" (get isabelle-size :cpus))\n(println \"  Memory:\" (get isabelle-size :memory-gb) \"GB\")\n(println)\n(println \"No shell wrapping. No string parsing.\")\n(println \"No {:continue true}. No exit code checking.\")\n(println \"VMs are values. Values are VMs.\")"
+    }
+  }
+}

@@ -1,0 +1,101 @@
+;; Plurigrid ASI × Comfy Pilot Interleaving Index
+;;
+;; 5 skills extracted from DuckLake analysis of 910 babashka calls
+;; across 26 sessions, showing how boxxy subsumes each pattern.
+;;
+;; GF(3) balanced triad:
+;;   Trit 0 (ZERO/ergodic):  belief-revision-vm
+;;   Trit 1 (PLUS/generator): filesystem-intelligence, metacircular-provider
+;;   Trit 2 (MINUS/validator): container-orchestration, shell-bridge
+;;
+;; DuckLake provenance: ~/.claude/interactions.ducklake
+;; Run: duckdb -c ".read analytics/ducklake_init.sql" to regenerate
+
+{:ecosystem "plurigrid-asi"
+ :source    "https://github.com/plurigrid/asi"
+ :version   "1.0.0"
+
+ :ducklake-provenance
+ {:total-babashka-calls 910
+  :total-sessions       26
+  :total-projects       2
+  :categories
+  {:shell-exec       299
+   :other-clojure    204
+   :file-read        143
+   :filesystem       122
+   :file-write        95
+   :apple-containers   19
+   :json-processing    13
+   :network            11
+   :encoding            4}}
+
+ :skills
+ [{:id    "shell-bridge"
+   :trit  2
+   :color "#D822A5"
+   :calls 299
+   :maps  "babashka.process/shell → vz/ native"}
+
+  {:id    "filesystem-intelligence"
+   :trit  1
+   :color "#0BC68E"
+   :calls 360
+   :maps  "babashka.fs + slurp + spit → EDN-as-code"}
+
+  {:id    "container-orchestration"
+   :trit  2
+   :color "#1533EA"
+   :calls 19
+   :maps  "container CLI wrapping → vz/ Virtualization.framework"}
+
+  {:id    "metacircular-provider"
+   :trit  1
+   :color "#0BC68E"
+   :calls 217
+   :maps  "cheshire JSON + edn/read → provider.edn self-description"}
+
+  {:id    "belief-revision-vm"
+   :trit  0
+   :color "#91BE25"
+   :calls 0
+   :maps  "cognitive science tables → DuckDB ACSet × vz/ snapshots"}]
+
+ :interleaving-schedule
+ ;; GF(3) round-robin: trit 0, 1, 2, 0, 1, 2 ...
+ [:belief-revision-vm        ;; 0 — coordinate
+  :filesystem-intelligence   ;; 1 — generate
+  :shell-bridge              ;; 2 — validate
+  :belief-revision-vm        ;; 0 — coordinate (with new beliefs)
+  :metacircular-provider     ;; 1 — generate (self-description)
+  :container-orchestration]  ;; 2 — validate (infrastructure)
+
+ :boxxy-evaluator
+ {:special-forms [:quote :def :let :fn :if :do :require :ns]
+  :builtins 26
+  :vz-functions 21
+  :file "internal/lisp/eval.go"
+  :lines 614}
+
+ :babashka-comparison
+ {:babashka-has-boxxy-lacks
+  ["babashka.process (shell subprocess spawning)"
+   "babashka.fs (host filesystem glob/exists?/create-dirs)"
+   "cheshire (JSON parsing)"
+   "clojure.java.io (Java I/O streams)"
+   "java.util.Base64"
+   "clojure.data.json"
+   "require with classpath resolution"
+   "destructuring bindings"
+   "macros (defn, when, doseq, ->, ->>)"]
+
+  :boxxy-has-babashka-lacks
+  ["vz/ namespace (Apple Virtualization.framework)"
+   "memory snapshots with branching (max 16)"
+   "VM pause/resume/stop as Lisp operations"
+   "belief revision system (DuckDB ACSet)"
+   "GF(3) trit coloring per value"
+   "metacircular provider.edn self-description"
+   "Rosetta 2 for x86_64 inside ARM64 VMs"
+   "hardened sandbox mode (no network)"
+   "EFI/Linux/macOS multi-boot from same evaluator"]}}

@@ -1,0 +1,190 @@
+{
+  "nodes": [
+    {
+      "id": 4,
+      "type": "CheckpointLoaderSimple",
+      "pos": [100, 100],
+      "size": [300, 60],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "outputs": [
+        {"name": "MODEL", "type": "MODEL", "links": [14], "slot_index": 0},
+        {"name": "CLIP", "type": "CLIP", "links": [12, 13], "slot_index": 1},
+        {"name": "VAE", "type": "VAE", "links": [15], "slot_index": 2}
+      ],
+      "title": "Load Checkpoint",
+      "properties": {},
+      "widgets_values": ["sd_xl_base_1.0.safetensors"]
+    },
+    {
+      "id": 20,
+      "type": "ControlNetLoader",
+      "pos": [100, 260],
+      "size": [300, 60],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "outputs": [
+        {"name": "CONTROL_NET", "type": "CONTROL_NET", "links": [40], "slot_index": 0}
+      ],
+      "title": "Load ControlNet (Canny)",
+      "properties": {},
+      "widgets_values": ["control-lora-canny-rank256.safetensors"]
+    },
+    {
+      "id": 10,
+      "type": "LoadImage",
+      "pos": [100, 400],
+      "size": [300, 80],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "outputs": [
+        {"name": "IMAGE", "type": "IMAGE", "links": [50], "slot_index": 0},
+        {"name": "MASK", "type": "MASK", "links": [], "slot_index": 1}
+      ],
+      "title": "Reference Image",
+      "properties": {},
+      "widgets_values": ["reference.png"]
+    },
+    {
+      "id": 25,
+      "type": "Canny",
+      "pos": [420, 400],
+      "size": [260, 80],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "outputs": [
+        {"name": "IMAGE", "type": "IMAGE", "links": [51], "slot_index": 0}
+      ],
+      "title": "Canny Edge Detection",
+      "properties": {},
+      "widgets_values": [100, 200]
+    },
+    {
+      "id": 6,
+      "type": "CLIPTextEncode",
+      "pos": [420, 100],
+      "size": [300, 120],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "outputs": [
+        {"name": "CONDITIONING", "type": "CONDITIONING", "links": [16], "slot_index": 0}
+      ],
+      "title": "Positive Prompt",
+      "properties": {},
+      "widgets_values": ["architectural photo, modern building, sharp details, professional"]
+    },
+    {
+      "id": 7,
+      "type": "CLIPTextEncode",
+      "pos": [420, 260],
+      "size": [300, 120],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "outputs": [
+        {"name": "CONDITIONING", "type": "CONDITIONING", "links": [17], "slot_index": 0}
+      ],
+      "title": "Negative Prompt",
+      "properties": {},
+      "widgets_values": ["blurry, low quality, distorted, artifacts"]
+    },
+    {
+      "id": 21,
+      "type": "ControlNetApplyAdvanced",
+      "pos": [740, 250],
+      "size": [300, 100],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "outputs": [
+        {"name": "positive", "type": "CONDITIONING", "links": [41], "slot_index": 0},
+        {"name": "negative", "type": "CONDITIONING", "links": [42], "slot_index": 1}
+      ],
+      "title": "Apply ControlNet",
+      "properties": {},
+      "widgets_values": [1.0, 0.0, 1.0]
+    },
+    {
+      "id": 5,
+      "type": "EmptyLatentImage",
+      "pos": [740, 420],
+      "size": [260, 80],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "outputs": [
+        {"name": "LATENT", "type": "LATENT", "links": [60], "slot_index": 0}
+      ],
+      "title": "Empty Latent",
+      "properties": {},
+      "widgets_values": [1024, 1024, 1]
+    },
+    {
+      "id": 3,
+      "type": "KSampler",
+      "pos": [1060, 140],
+      "size": [300, 260],
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "outputs": [
+        {"name": "LATENT", "type": "LATENT", "links": [2], "slot_index": 0}
+      ],
+      "title": "Sampler",
+      "properties": {},
+      "widgets_values": [-1, "fixed", 30, 7.5, "dpmpp_2m", "normal", 1.0, false]
+    },
+    {
+      "id": 8,
+      "type": "VAEDecode",
+      "pos": [1380, 140],
+      "size": [210, 46],
+      "flags": {},
+      "order": 9,
+      "mode": 0,
+      "outputs": [
+        {"name": "IMAGE", "type": "IMAGE", "links": [3], "slot_index": 0}
+      ],
+      "title": "Decode",
+      "properties": {},
+      "widgets_values": []
+    },
+    {
+      "id": 9,
+      "type": "PreviewImage",
+      "pos": [1600, 140],
+      "size": [210, 58],
+      "flags": {},
+      "order": 10,
+      "mode": 0,
+      "title": "Preview",
+      "properties": {},
+      "widgets_values": []
+    }
+  ],
+  "links": [
+    [2, 3, 0, 8, 0, "LATENT"],
+    [3, 8, 0, 9, 0, "IMAGE"],
+    [12, 4, 1, 6, 0, "CLIP"],
+    [13, 4, 1, 7, 0, "CLIP"],
+    [14, 4, 0, 3, 0, "MODEL"],
+    [15, 4, 2, 8, 1, "VAE"],
+    [16, 6, 0, 21, 0, "CONDITIONING"],
+    [17, 7, 0, 21, 1, "CONDITIONING"],
+    [40, 20, 0, 21, 2, "CONTROL_NET"],
+    [41, 21, 0, 3, 1, "CONDITIONING"],
+    [42, 21, 1, 3, 2, "CONDITIONING"],
+    [50, 10, 0, 25, 0, "IMAGE"],
+    [51, 25, 0, 21, 3, "IMAGE"],
+    [60, 5, 0, 3, 3, "LATENT"]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {},
+  "version": 0.4
+}

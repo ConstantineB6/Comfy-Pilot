@@ -1,0 +1,43 @@
+{
+  "id": "metacircular-provider",
+  "name": "Metacircular Provider (EDN as Code as Data as VM)",
+  "version": "1.0.0",
+  "author": "plurigrid",
+  "category": "foundational",
+  "trit": 1,
+  "trit_name": "PLUS",
+  "color": "#0BC68E",
+  "description": "The metacircular core: boxxy's provider.edn describes the evaluator that reads provider.edn. Interleaves the babashka JSON-processing pattern (13 calls) and EDN-as-configuration pattern with boxxy's self-describing VM specification. Each vz/ function is both a spec AND a callable.",
+  "tags": ["metacircular", "edn", "provider", "eval-apply", "self-reference", "boxxy"],
+  "provenance": {
+    "ducklake_query": "SELECT * FROM lake.babashka_usage WHERE usage_category IN ('json-processing', 'other-clojure')",
+    "observed_calls": 217,
+    "boxxy_file": "std/provider.edn",
+    "sdf_chapter": "Ch5 Evaluation — eval/apply interpreters"
+  },
+  "interleaving": {
+    "babashka_pattern": "cheshire.core/parse-string for JSON configs, clojure.edn/read-string for EDN specs",
+    "boxxy_pattern": "provider.edn IS the evaluator spec — quote/def/let/fn/if/do + vz/ namespace",
+    "sdf_connection": "SDF Ch5: 'The evaluator, which determines the meaning of expressions, is just another program.' boxxy's provider.edn is this principle made literal."
+  },
+  "evaluator_shape": {
+    "special_forms": ["quote", "def", "let", "fn", "if", "do", "require", "ns"],
+    "value_types": ["nil", "bool", "int", "float", "string", "symbol", "keyword", "list", "vector", "hash-map", "fn", "external-value"],
+    "builtins": ["+", "-", "*", "/", "=", "<", ">", "nil?", "string?", "number?", "vector?", "type", "println", "print", "str", "vector", "count", "first", "rest", "nth", "conj", "get", "assoc", "or", "and", "not", "getenv"],
+    "vz_extensions": ["vz/new-vm-config", "vz/new-linux-boot-loader", "vz/new-efi-boot-loader", "vz/start-vm!", "vz/stop-vm!", "vz/pause-vm!", "vz/resume-vm!", "vz/vm-state", "vz/create-disk-image", "vz/validate-config"]
+  },
+  "examples": {
+    "babashka_json_config": {
+      "description": "Babashka reading MCP server config as JSON (observed pattern)",
+      "code": "(require '[cheshire.core :as json])\n\n(let [config (-> (slurp \"~/.claude/settings.json\")\n                 (json/parse-string true))]\n  (println \"MCP servers:\" (keys (:mcpServers config)))\n  (doseq [[name cfg] (:mcpServers config)]\n    (println \"  \" name \"→\" (:command cfg))))"
+    },
+    "babashka_edn_provider": {
+      "description": "Babashka reading boxxy's own provider spec",
+      "code": "(require '[clojure.edn :as edn])\n\n(let [provider (edn/read-string (slurp \"std/provider.edn\"))]\n  (println \"Provider:\" (:provider/name provider))\n  (println \"Trit:\" (:provider/trit provider))\n  (println \"Color:\" (:provider/color provider))\n  (doseq [bl (get-in provider [:vz/namespace :boot-loaders])]\n    (println \"  Boot loader:\" (:name bl) \"→\" (:color bl))))"
+    },
+    "boxxy_self_description": {
+      "description": "boxxy reading its own spec metacircularly",
+      "code": ";; boxxy evaluates this file.\n;; This file describes boxxy's evaluator.\n;; The evaluator reads this description.\n;; The description is evaluated by the evaluator.\n;;\n;; (SDF Ch5: eval/apply is a universal machine)\n\n(def provider-spec\n  {:provider/name \"boxxy\"\n   :provider/trit 0\n   :evaluator\n   {:special-forms [:quote :def :let :fn :if :do]\n    :builtins [:+ :- :* :/ := :println :get :assoc :first :rest]}})\n\n;; The evaluator can inspect itself\n(println \"I am:\" (get provider-spec :provider/name))\n(println \"My forms:\" (get (get provider-spec :evaluator) :special-forms))\n(println \"My builtins:\" (get (get provider-spec :evaluator) :builtins))\n\n;; And it can create VMs that run copies of itself\n(def boot (vz/new-efi-variable-store \"/tmp/boxxy-nvram\" true))\n(println \"NVRAM created — boxxy inside boxxy inside boxxy\")"
+    }
+  }
+}

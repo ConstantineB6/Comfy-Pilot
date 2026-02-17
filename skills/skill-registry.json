@@ -1,0 +1,265 @@
+{
+  "version": "1.0.0",
+  "registry_version": "2025-01-28",
+  "total_skills": 6,
+  "categories": {
+    "generation": 3,
+    "processing": 2,
+    "advanced": 1,
+    "community": 0
+  },
+
+  "core_skills": [
+    {
+      "id": "sdxl-generation",
+      "name": "SDXL Generation Base",
+      "version": "1.0.2",
+      "author": "comfy-pilot",
+      "category": "generation",
+      "path": "skills/core/sdxl-generation/",
+      "description": "Production-ready SDXL pipeline with quality settings and optimization. Perfect starting point for image generation workflows.",
+      "tags": ["sdxl", "generation", "core", "text-to-image", "stable"],
+      "rating": 4.8,
+      "downloads": 5420,
+      "active_users": 1200,
+      "updated": "2025-01-28",
+      "status": "production",
+      "featured": true
+    },
+    {
+      "id": "img2img",
+      "name": "Image-to-Image Transform",
+      "version": "1.0.0",
+      "author": "comfy-pilot",
+      "category": "generation",
+      "path": "skills/core/img2img/",
+      "description": "Transform existing images with text prompts. Control how much of the original to preserve with denoise strength.",
+      "tags": ["img2img", "transform", "style-transfer", "core"],
+      "rating": 4.7,
+      "downloads": 3200,
+      "active_users": 890,
+      "updated": "2025-01-28",
+      "status": "production",
+      "featured": false
+    },
+    {
+      "id": "inpainting",
+      "name": "Inpainting",
+      "version": "1.0.0",
+      "author": "comfy-pilot",
+      "category": "processing",
+      "path": "skills/core/inpainting/",
+      "description": "Selectively regenerate masked regions of an image. Remove objects, fill backgrounds, or replace content.",
+      "tags": ["inpainting", "mask", "edit", "remove", "fill", "core"],
+      "rating": 4.6,
+      "downloads": 2800,
+      "active_users": 760,
+      "updated": "2025-01-28",
+      "status": "production",
+      "featured": false
+    },
+    {
+      "id": "upscale-4x",
+      "name": "4x Upscale (Real-ESRGAN)",
+      "version": "1.0.0",
+      "author": "comfy-pilot",
+      "category": "processing",
+      "path": "skills/core/upscale-4x/",
+      "description": "Upscale images to 4x resolution using Real-ESRGAN. Fast, deterministic, model-based upscaling.",
+      "tags": ["upscale", "esrgan", "super-resolution", "enhance", "core"],
+      "rating": 4.9,
+      "downloads": 4100,
+      "active_users": 1050,
+      "updated": "2025-01-28",
+      "status": "production",
+      "featured": true
+    },
+    {
+      "id": "controlnet-canny",
+      "name": "ControlNet Canny Edge",
+      "version": "1.0.0",
+      "author": "comfy-pilot",
+      "category": "advanced",
+      "path": "skills/core/controlnet-canny/",
+      "description": "Generate images guided by edge structure from a reference image using ControlNet with Canny edge detection.",
+      "tags": ["controlnet", "canny", "edge", "structure", "guided", "core"],
+      "rating": 4.5,
+      "downloads": 1900,
+      "active_users": 520,
+      "updated": "2025-01-28",
+      "status": "production",
+      "featured": false
+    },
+    {
+      "id": "flux-generation",
+      "name": "Flux Generation",
+      "version": "1.0.0",
+      "author": "comfy-pilot",
+      "category": "generation",
+      "path": "skills/core/flux-generation/",
+      "description": "State-of-the-art text-to-image with Flux models. T5 encoder for superior prompt understanding, Dev and Schnell variants.",
+      "tags": ["flux", "generation", "text-to-image", "t5", "state-of-the-art", "core"],
+      "rating": 4.8,
+      "downloads": 3800,
+      "active_users": 980,
+      "updated": "2025-01-28",
+      "status": "production",
+      "featured": true
+    }
+  ],
+
+  "upcoming_skills": [
+    {
+      "id": "sdxl-turbo",
+      "name": "SDXL Turbo (Fast)",
+      "estimated_release": "2025-02-04",
+      "description": "Ultra-fast 4-step SDXL generation",
+      "category": "generation"
+    },
+    {
+      "id": "sdxl-refined",
+      "name": "SDXL Refined (Quality)",
+      "estimated_release": "2025-02-04",
+      "description": "High-quality SDXL with refiner pipeline",
+      "category": "generation"
+    },
+    {
+      "id": "controlnet-pose",
+      "name": "ControlNet Pose Control",
+      "estimated_release": "2025-02-18",
+      "description": "Generate images with specific poses using ControlNet",
+      "category": "advanced"
+    },
+    {
+      "id": "batch-generation",
+      "name": "Batch Generation",
+      "estimated_release": "2025-02-25",
+      "description": "Generate multiple images with variations",
+      "category": "advanced"
+    },
+    {
+      "id": "flux-inpaint",
+      "name": "Flux Fill (Inpainting)",
+      "estimated_release": "2025-02-11",
+      "description": "Flux-based inpainting and outpainting",
+      "category": "processing"
+    },
+    {
+      "id": "video-generation",
+      "name": "Video Generation (LTX-Video)",
+      "estimated_release": "2025-03-01",
+      "description": "Text-to-video and image-to-video generation",
+      "category": "generation"
+    }
+  ],
+
+  "featured_skills": [
+    "sdxl-generation",
+    "upscale-4x",
+    "flux-generation"
+  ],
+
+  "trending_skills": [
+    {
+      "id": "sdxl-generation",
+      "trend_score": 100,
+      "downloads_this_week": 240,
+      "new_users_this_week": 85
+    }
+  ],
+
+  "skill_discovery": {
+    "how_to_find": [
+      "skill list - Show all available skills",
+      "skill search generation - Search skills",
+      "skill info sdxl-generation - Get details",
+      "skill install sdxl-generation - Install"
+    ],
+    "installation": "Automatic - Claude Code discovers skills from this registry"
+  },
+
+  "community": {
+    "total_community_skills": 0,
+    "most_rated": [],
+    "most_downloaded": [],
+    "newest": []
+  },
+
+  "stats": {
+    "total_downloads": 21240,
+    "active_users": 3400,
+    "workflows_created": 18500,
+    "contributors": 3
+  },
+
+  "external_ecosystems": [
+    {
+      "id": "trailofbits-skills",
+      "name": "Trail of Bits Security Skills",
+      "source": "https://github.com/trailofbits/skills",
+      "stars": 2200,
+      "total_skills": 49,
+      "install": "claude /plugin marketplace add trailofbits/skills",
+      "description": "49 security-focused Claude Code skills from Trail of Bits. Static analysis, fuzzing, vulnerability scanning, code review, and secure development patterns.",
+      "categories": ["security", "analysis", "fuzzing", "code-review"],
+      "format": "SKILL.md with YAML frontmatter",
+      "highlights": [
+        "semgrep - Custom rule creation and analysis",
+        "codeql - Variant analysis and vulnerability detection",
+        "cargo-fuzz / libfuzzer / aflpp - Fuzzing harness generation",
+        "constant-time-analysis - Timing side-channel detection",
+        "reverse-engineering - Binary analysis with radare2/Ghidra"
+      ]
+    },
+    {
+      "id": "plurigrid-asi",
+      "name": "Plurigrid ASI Agent Skills",
+      "source": "https://github.com/plurigrid/asi",
+      "stars": 150,
+      "total_skills": 370,
+      "install": "npx ai-agent-skills install plurigrid/asi",
+      "description": "370+ AI agent skills with GF(3) balanced ternary logic. Includes 5 boxxy interleaving skills derived from DuckLake analysis of 910 babashka calls, showing babashka→boxxy subsumption via native Virtualization.framework access.",
+      "categories": ["agent-skills", "categorical", "distributed", "scientific", "virtualization"],
+      "format": "agentskills.io specification + .joke (boxxy Lisp)",
+      "local_skills": "skills/ecosystems/plurigrid-asi/",
+      "highlights": [
+        "shell-bridge - 299 babashka shell calls → native vz/ VM operations",
+        "filesystem-intelligence - 360 fs/slurp/spit calls → EDN-as-code metacircular reading",
+        "container-orchestration - Apple Containers (neo4j, jaeger, isabelle) → vz/ namespace",
+        "metacircular-provider - provider.edn describes the evaluator that reads provider.edn",
+        "belief-revision-vm - Cognitive science tables × DuckDB ACSet × vz/ memory snapshots",
+        "GF(3) balanced ternary: +1 generator, 0 coordinator, -1 validator",
+        "effective-topos - 62-package Flox dev environment (606 man pages)",
+        "DuckLake provenance: every skill traces to observed babashka usage patterns"
+      ],
+      "ducklake_provenance": {
+        "total_babashka_calls": 910,
+        "sessions_analyzed": 26,
+        "top_session": "15dcff1d (110 calls, Apple container management)",
+        "query": "SELECT * FROM lake.babashka_usage GROUP BY usage_category ORDER BY count(*) DESC"
+      }
+    },
+    {
+      "id": "sdf-flexibility",
+      "name": "Software Design for Flexibility",
+      "source": "Hanson & Sussman, 2021 (MIT Press)",
+      "description": "Design patterns for flexible software from the MIT tradition. 10 chapters with GF(3) internal structure forming balanced triads with SICP, propagators, and effective-topos.",
+      "categories": ["design-patterns", "scheme", "flexibility", "education"],
+      "format": "Skill specification with SDF chapter references",
+      "highlights": [
+        "Ch5 Evaluation - eval/apply interpreters (primary)",
+        "Ch4 Pattern Matching - rule-based dispatch",
+        "Ch7 Propagators - constraint-based programming",
+        "Ch3 Variations on a Theme - combinators and wrappers",
+        "GF(3) trit: -1 (validator) - balances with SICP (+1) and propagators (0)"
+      ]
+    }
+  ],
+
+  "resources": {
+    "specification": "SKILL_SPEC.md",
+    "documentation": "https://github.com/anthropics/comfy-pilot/wiki/Skills",
+    "contribute": "https://github.com/anthropics/comfy-pilot/blob/main/SKILLS_CONTRIBUTE.md",
+    "discord": "https://discord.gg/comfy-pilot"
+  }
+}
