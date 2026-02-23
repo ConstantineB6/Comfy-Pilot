@@ -185,23 +185,20 @@ def install_claude_code():
 
 
 def get_claude_command(working_dir=None):
-    """Get the appropriate claude command based on whether a conversation exists.
+    """Get the appropriate claude command for the embedded terminal.
 
-    Returns the full path to claude if found via find_executable, otherwise just 'claude'.
+    Returns the full path to claude with --dangerously-skip-permissions
+    to avoid blocking permission prompts in the embedded terminal.
+    Always starts a fresh session to avoid conflicts with active conversations.
     """
     # Try to get the full path to claude
     claude_path = find_executable("claude")
-    if claude_path:
-        if has_claude_conversation(working_dir):
-            return f"{claude_path} -c"
-        else:
-            return claude_path
-    else:
-        # Fallback - let the shell try to find it
-        if has_claude_conversation(working_dir):
-            return "claude -c"
-        else:
-            return "claude"
+    if not claude_path:
+        claude_path = "claude"
+
+    # Always use --dangerously-skip-permissions for embedded terminal
+    # (permission prompts don't work well in the xterm.js widget)
+    return f"{claude_path} --dangerously-skip-permissions"
 
 
 class WebSocketTerminal:
@@ -235,6 +232,8 @@ class WebSocketTerminal:
             env = os.environ.copy()
             env["TERM"] = "xterm-256color"
             env["COLORTERM"] = "truecolor"
+            # Remove CLAUDECODE to prevent "nested session" detection
+            env.pop("CLAUDECODE", None)
 
             if command:
                 # Execute as interactive login shell with command
