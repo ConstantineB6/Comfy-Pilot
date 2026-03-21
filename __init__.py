@@ -31,6 +31,84 @@ else:
     signal = None
     resource = None
 
+
+class WindowsTerminal:
+    """Manages a subprocess session connected via WebSocket on Windows.
+
+    Uses subprocess.Popen with pipes instead of Unix PTY.
+    """
+
+    def __init__(self):
+        self.process = None
+        self.running = False
+        self._read_threads = []
+
+    def spawn(self, command=None):
+        """Spawn a new subprocess with the given command."""
+        import subprocess as sp
+
+        if not command:
+            command = "cmd.exe"
+
+        # Split command string into args for Popen
+        if isinstance(command, str):
+            parts = command.split()
+            cmd_exe = parts[0]
+            # .CMD files (like claude.CMD) must be run via cmd /c
+            if cmd_exe.lower().endswith('.cmd'):
+                args = ["cmd", "/c"] + parts
+            else:
+                args = parts
+        else:
+            args = command
+
+        try:
+            self.process = sp.Popen(
+                args,
+                stdin=sp.PIPE,
+                stdout=sp.PIPE,
+                stderr=sp.PIPE,
+                creationflags=sp.CREATE_NEW_PROCESS_GROUP,
+                bufsize=0,
+            )
+            self.running = True
+            return True
+        except Exception as e:
+            print(f"[Claude Code] Failed to spawn process: {e}")
+            return False
+
+    def resize(self, rows, cols):
+        """Resize is a no-op on Windows pipes (no PTY to resize)."""
+        pass
+
+    def write(self, data):
+        """Write data to the subprocess stdin."""
+        if not self.running or not self.process or not self.process.stdin:
+            return
+        try:
+            self.process.stdin.write(data.encode("utf-8"))
+            self.process.stdin.flush()
+        except (OSError, BrokenPipeError):
+            self.running = False
+
+    def close(self):
+        """Terminate the subprocess."""
+        self.running = False
+        if self.process:
+            try:
+                self.process.terminate()
+            except OSError:
+                pass
+            try:
+                self.process.wait(timeout=5)
+            except Exception:
+                try:
+                    self.process.kill()
+                except OSError:
+                    pass
+            self.process = None
+
+
 WEB_DIRECTORY = "./js"
 
 NODE_CLASS_MAPPINGS = {}
@@ -522,12 +600,130 @@ async def websocket_handler(request):
     await ws.prepare(request)
 
     if IS_WINDOWS:
-        # Send a message indicating terminal is not supported on Windows
-        await ws.send_str(json.dumps({
-            "type": "error",
-            "message": "Terminal not supported on Windows. Use Clawdbot or Claude Code CLI directly."
-        }))
-        await ws.close()
+        session_id = id(ws)
+        terminal = WindowsTerminal()
+        terminal_sessions[session_id] = terminal
+        terminal_started = False
+
+        print(f"[Claude Code] WebSocket connected (Windows): {session_id}")
+        log_memory("ws connect")
+
+        command = request.query.get("cmd", None)
+        if command is None:
+            command = get_claude_command()
+            print(f"[Claude Code] Auto-detected command: {command}")
+
+        if command in ("claude", "claude -c"):
+            print("[Claude Code] Claude CLI not found, attempting auto-install...")
+            success, message = install_claude_code()
+            if success:
+                command = get_claude_command()
+                print(f"[Claude Code] After install, command: {command}")
+
+        try:
+            setup_mcp_config()
+        except Exception as e:
+            print(f"[Claude Code] MCP setup error (non-fatal): {e}")
+
+        async def read_pipes():
+            """Read from stdout/stderr and send to WebSocket."""
+            import threading
+
+            loop = asyncio.get_event_loop()
+            output_queue = asyncio.Queue()
+
+            def reader(stream, name):
+                """Thread that reads from a pipe and pushes to the async queue."""
+                import codecs
+                decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
+                try:
+                    while terminal.running:
+                        chunk = stream.read(1)
+                        if not chunk:
+                            break
+                        text = decoder.decode(chunk)
+                        if text:
+                            loop.call_soon_threadsafe(output_queue.put_nowait, text)
+                except (OSError, ValueError):
+                    pass
+                finally:
+                    terminal.running = False
+                    loop.call_soon_threadsafe(output_queue.put_nowait, None)
+
+            stdout_thread = threading.Thread(
+                target=reader, args=(terminal.process.stdout, "stdout"), daemon=True
+            )
+            stderr_thread = threading.Thread(
+                target=reader, args=(terminal.process.stderr, "stderr"), daemon=True
+            )
+            stdout_thread.start()
+            stderr_thread.start()
+            terminal._read_threads = [stdout_thread, stderr_thread]
+
+            buffer = []
+            try:
+                while terminal.running and not ws.closed:
+                    try:
+                        item = await asyncio.wait_for(output_queue.get(), timeout=0.05)
+                        if item is None:
+                            break
+                        buffer.append(item)
+                        # Drain queue to batch sends
+                        while not output_queue.empty():
+                            item = output_queue.get_nowait()
+                            if item is None:
+                                break
+                            buffer.append(item)
+                        if buffer:
+                            await ws.send_str("o" + "".join(buffer))
+                            buffer.clear()
+                    except asyncio.TimeoutError:
+                        if buffer:
+                            await ws.send_str("o" + "".join(buffer))
+                            buffer.clear()
+            except Exception as e:
+                print(f"[Claude Code] Read error: {e}")
+
+        read_task = None
+
+        try:
+            async for msg in ws:
+                if msg.type == web.WSMsgType.TEXT:
+                    try:
+                        data = json.loads(msg.data)
+                        msg_type = data.get("type")
+
+                        if msg_type == "i":
+                            terminal.write(data.get("d", ""))
+                        elif msg_type == "input":
+                            terminal.write(data.get("data", ""))
+                        elif msg_type == "resize":
+                            rows = data.get("rows", 24)
+                            cols = data.get("cols", 80)
+
+                            if not terminal_started:
+                                if terminal.spawn(command):
+                                    terminal_started = True
+                                    read_task = asyncio.create_task(read_pipes())
+                                    print(f"[Claude Code] Terminal started (Windows) with size {cols}x{rows}")
+                                else:
+                                    await ws.send_str("o\x1b[1;31mFailed to start terminal process.\x1b[0m\r\n")
+                                    break
+                            terminal.resize(rows, cols)
+                    except json.JSONDecodeError:
+                        pass
+                elif msg.type == web.WSMsgType.ERROR:
+                    print(f"[Claude Code] WebSocket error: {ws.exception()}")
+                    break
+        finally:
+            terminal.running = False
+            if read_task:
+                read_task.cancel()
+            terminal.close()
+            del terminal_sessions[session_id]
+            print(f"[Claude Code] WebSocket disconnected (Windows): {session_id}")
+            log_memory("ws disconnect")
+
         return ws
 
     session_id = id(ws)
@@ -660,7 +856,7 @@ async def mcp_status_handler(request):
                 "connected": True,
                 "tools": 15,  # Known tool count
                 "platform": "windows" if IS_WINDOWS else "unix",
-                "terminal_supported": not IS_WINDOWS
+                "terminal_supported": True
             })
         else:
             return web.json_response({
@@ -680,7 +876,7 @@ async def platform_info_handler(request):
     return web.json_response({
         "platform": sys.platform,
         "is_windows": IS_WINDOWS,
-        "terminal_supported": not IS_WINDOWS,
+        "terminal_supported": True,
         "python_version": sys.version,
         "comfyui_url": get_comfyui_url_cached()
     })
@@ -722,7 +918,7 @@ def setup_routes(app):
     print("[Claude Code] Memory stats endpoint registered at /claude-code/memory")
     print("[Claude Code] Platform info endpoint registered at /claude-code/platform")
     if IS_WINDOWS:
-        print("[Claude Code] Note: Terminal functionality disabled on Windows")
+        print("[Claude Code] Windows terminal support enabled (subprocess mode)")
 
 
 def write_comfyui_url():
@@ -807,15 +1003,12 @@ try:
     # Write ComfyUI URL for MCP server
     write_comfyui_url()
 
-    # Set up MCP configuration (skip on Windows if claude not found)
-    if not IS_WINDOWS:
-        setup_mcp_config()
-    else:
-        print("[Claude Code] Skipping MCP auto-config on Windows (use Clawdbot instead)")
+    # Set up MCP configuration
+    setup_mcp_config()
 
     # Log initial memory usage
     mem_mb = get_memory_mb()
-    platform_note = " (Windows - terminal disabled)" if IS_WINDOWS else ""
+    platform_note = " (Windows - subprocess mode)" if IS_WINDOWS else ""
     print(f"[Claude Code] Plugin loaded successfully{platform_note} (Memory: {mem_mb:.1f}MB)")
 except Exception as e:
     print(f"[Claude Code] Failed to register routes: {e}")
