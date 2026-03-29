@@ -18,6 +18,10 @@ Building ComfyUI workflows means manually searching for nodes, dragging connecti
 
 No copy-pasting node names. No hunting through menus. Just say what you want.
 
+## Hosted deployment
+
+A hosted deployment is available on [Fronteir AI](https://fronteir.ai/mcp/constantineb6-comfy-pilot).
+
 ## Installation
 
 **CLI (Recommended):**
