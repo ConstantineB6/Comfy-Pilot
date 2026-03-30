@@ -233,6 +233,7 @@ class WebSocketTerminal:
         if self.pid == 0:
             # Child process
             env = os.environ.copy()
+            env.pop("CLAUDECODE", None)
             env["TERM"] = "xterm-256color"
             env["COLORTERM"] = "truecolor"
 
@@ -518,7 +519,7 @@ async def run_node_handler(request):
 
 async def websocket_handler(request):
     """Handle WebSocket connections for terminal sessions."""
-    ws = web.WebSocketResponse()
+    ws = web.WebSocketResponse(heartbeat=30.0)
     await ws.prepare(request)
 
     if IS_WINDOWS:

@@ -6,6 +6,7 @@ let terminal = null;
 let fitAddon = null;
 let websocket = null;
 let claudeRunning = false;
+let keepaliveInterval = null;
 
 app.registerExtension({
     name: "comfy.claude-code",
@@ -680,6 +681,14 @@ function connectWebSocket() {
         websocket.onopen = () => {
             console.log("[Claude Code] WebSocket connected");
 
+            // Start keepalive ping every 25 seconds to prevent idle disconnect
+            if (keepaliveInterval) clearInterval(keepaliveInterval);
+            keepaliveInterval = setInterval(() => {
+                if (websocket && websocket.readyState === WebSocket.OPEN) {
+                    websocket.send(JSON.stringify({ type: "ping" }));
+                }
+            }, 25000);
+
             // Clear terminal first
             terminal.clear();
 
@@ -732,6 +741,10 @@ function connectWebSocket() {
 
         websocket.onclose = (event) => {
             console.log("[Claude Code] WebSocket closed:", event.code, event.reason);
+            if (keepaliveInterval) {
+                clearInterval(keepaliveInterval);
+                keepaliveInterval = null;
+            }
             terminal.writeln("\n\x1b[1;31mTerminal disconnected.\x1b[0m");
             terminal.writeln("Click ↻ to reload.\n");
         };
