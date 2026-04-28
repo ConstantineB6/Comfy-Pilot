@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/constantineb6-comfy-pilot-badge.png)](https://mseep.ai/app/constantineb6-comfy-pilot)
+
 # Comfy Pilot
 
 [![Stars](https://img.shields.io/github/stars/ConstantineB6/Comfy-Pilot)](https://github.com/ConstantineB6/Comfy-Pilot/stargazers)
