@@ -193,15 +193,15 @@ def get_claude_command(working_dir=None):
     claude_path = find_executable("claude")
     if claude_path:
         if has_claude_conversation(working_dir):
-            return f"{claude_path} -c --enable-auto-mode"
+            return f"{claude_path} -c --permission-mode auto"
         else:
-            return f"{claude_path} --enable-auto-mode"
+            return f"{claude_path} --permission-mode auto"
     else:
         # Fallback - let the shell try to find it
         if has_claude_conversation(working_dir):
-            return "claude -c --enable-auto-mode"
+            return "claude -c --permission-mode auto"
         else:
-            return "claude --enable-auto-mode"
+            return "claude --permission-mode auto"
 
 
 class WebSocketTerminal:
