@@ -1,0 +1,2 @@
+# Windows-only: ConPTY backend for the embedded terminal.
+pywinpty>=2.0; sys_platform == "win32"

@@ -1,6 +1,6 @@
 # ComfyUI Claude Code Plugin
 # A floating window extension for Claude Code integration
-# Windows-compatible version - terminal disabled, REST endpoints enabled
+# Terminal works on Unix (pty) and Windows (pywinpty/ConPTY).
 
 import asyncio
 import json
@@ -30,6 +30,18 @@ else:
     termios = None
     signal = None
     resource = None
+
+# Windows terminal backend: pywinpty (ConPTY). Optional - guarded so the rest of
+# the plugin still loads if it isn't installed.
+WINPTY_AVAILABLE = False
+_WinPtyProcess = None
+if IS_WINDOWS:
+    try:
+        from winpty import PtyProcess as _WinPtyProcess
+        WINPTY_AVAILABLE = True
+    except Exception as _winpty_err:
+        print(f"[Claude Code] pywinpty not available, terminal disabled on Windows: {_winpty_err}")
+        print("[Claude Code] Install it with: python -m pip install pywinpty")
 
 WEB_DIRECTORY = "./js"
 
@@ -106,6 +118,8 @@ def find_executable(name, verbose=False):
     # Windows-specific paths
     if IS_WINDOWS:
         common_paths.extend([
+            # Official Claude Code installer location (install.ps1)
+            os.path.expanduser(f"~\\.local\\bin\\{name}.exe"),
             os.path.expanduser(f"~\\AppData\\Local\\Programs\\{name}\\{name}.exe"),
             os.path.expanduser(f"~\\AppData\\Roaming\\npm\\{name}.cmd"),
             os.path.expanduser(f"~\\.claude\\local\\{name}.exe"),
@@ -213,6 +227,7 @@ class WebSocketTerminal:
     def __init__(self):
         self.fd = None
         self.pid = None
+        self.proc = None  # winpty PtyProcess (Windows)
         self.websocket = None
         self.read_thread = None
         self.running = False
@@ -221,9 +236,28 @@ class WebSocketTerminal:
     def spawn(self, command=None):
         """Spawn a new PTY with an optional command."""
         if IS_WINDOWS:
-            print("[Claude Code] Terminal not supported on Windows")
-            return False
-            
+            if not WINPTY_AVAILABLE:
+                print("[Claude Code] Terminal unavailable: pywinpty not installed")
+                return False
+            # ConPTY-backed terminal via pywinpty. `command` is a command line
+            # string (e.g. 'C:\\...\\claude.exe' or '... -c'); winpty parses it.
+            cmd = command or os.environ.get("COMSPEC", "cmd.exe")
+            env = os.environ.copy()
+            env["TERM"] = "xterm-256color"
+            env["COLORTERM"] = "truecolor"
+            try:
+                self.proc = _WinPtyProcess.spawn(
+                    cmd,
+                    cwd=os.getcwd(),
+                    env=env,
+                    dimensions=(24, 80),
+                )
+            except Exception as e:
+                print(f"[Claude Code] Failed to spawn winpty terminal: {e}")
+                return False
+            self.running = True
+            return True
+
         # Get the user's default shell
         shell = os.environ.get("SHELL", "/bin/bash")
 
@@ -253,7 +287,14 @@ class WebSocketTerminal:
 
     def resize(self, rows, cols):
         """Resize the PTY and notify the child process."""
-        if IS_WINDOWS or not self.fd:
+        if IS_WINDOWS:
+            if self.proc:
+                try:
+                    self.proc.setwinsize(rows, cols)
+                except Exception:
+                    pass
+            return
+        if not self.fd:
             return
         winsize = struct.pack("HHHH", rows, cols, 0, 0)
         fcntl.ioctl(self.fd, termios.TIOCSWINSZ, winsize)
@@ -266,9 +307,32 @@ class WebSocketTerminal:
 
     def write(self, data):
         """Write data to the PTY."""
-        if IS_WINDOWS or not self.fd:
+        if IS_WINDOWS:
+            if self.proc:
+                try:
+                    self.proc.write(data)
+                except Exception:
+                    self.running = False
+            return
+        if not self.fd:
             return
         os.write(self.fd, data.encode("utf-8"))
+
+    def read_blocking_win(self, size=4096):
+        """Blocking read for Windows (winpty). Returns str, or None on EOF.
+
+        Intended to be called from a dedicated reader thread, not the event loop.
+        """
+        if not self.proc:
+            return None
+        try:
+            return self.proc.read(size)
+        except EOFError:
+            self.running = False
+            return None
+        except Exception:
+            self.running = False
+            return None
 
     def read_nonblock(self):
         """Non-blocking read from PTY, returns None if no data available."""
@@ -309,6 +373,12 @@ class WebSocketTerminal:
         """Close the PTY."""
         self.running = False
         if IS_WINDOWS:
+            if self.proc:
+                try:
+                    self.proc.terminate(force=True)
+                except Exception:
+                    pass
+                self.proc = None
             return
         if self.fd:
             try:
@@ -521,12 +591,10 @@ async def websocket_handler(request):
     ws = web.WebSocketResponse()
     await ws.prepare(request)
 
-    if IS_WINDOWS:
-        # Send a message indicating terminal is not supported on Windows
-        await ws.send_str(json.dumps({
-            "type": "error",
-            "message": "Terminal not supported on Windows. Use Clawdbot or Claude Code CLI directly."
-        }))
+    if IS_WINDOWS and not WINPTY_AVAILABLE:
+        # Terminal needs pywinpty (ConPTY) on Windows.
+        await ws.send_str("o\x1b[1;31mTerminal unavailable: pywinpty is not installed.\x1b[0m\r\n")
+        await ws.send_str("oInstall it with:\r\n  python -m pip install pywinpty\r\nthen restart ComfyUI.\r\n")
         await ws.close()
         return ws
 
@@ -568,6 +636,36 @@ async def websocket_handler(request):
     async def read_pty():
         """Read from PTY and send to WebSocket."""
         loop = asyncio.get_event_loop()
+
+        if IS_WINDOWS:
+            # The Windows event loop (Proactor) doesn't support add_reader, and
+            # winpty reads are blocking, so pump output from a dedicated thread
+            # into an asyncio.Queue.
+            import threading
+            queue = asyncio.Queue()
+
+            def reader_thread():
+                try:
+                    while terminal.running:
+                        data = terminal.read_blocking_win(4096)
+                        if data is None:
+                            break
+                        if data:
+                            loop.call_soon_threadsafe(queue.put_nowait, data)
+                finally:
+                    loop.call_soon_threadsafe(queue.put_nowait, None)  # EOF sentinel
+
+            threading.Thread(target=reader_thread, daemon=True).start()
+            try:
+                while not ws.closed:
+                    data = await queue.get()
+                    if data is None:
+                        break
+                    await ws.send_str("o" + data)
+            except Exception as e:
+                print(f"[Claude Code] Read error (win): {e}")
+            return
+
         fd = terminal.fd
         read_event = asyncio.Event()
         pending_data = []
@@ -660,7 +758,7 @@ async def mcp_status_handler(request):
                 "connected": True,
                 "tools": 15,  # Known tool count
                 "platform": "windows" if IS_WINDOWS else "unix",
-                "terminal_supported": not IS_WINDOWS
+                "terminal_supported": (not IS_WINDOWS) or WINPTY_AVAILABLE
             })
         else:
             return web.json_response({
@@ -680,7 +778,7 @@ async def platform_info_handler(request):
     return web.json_response({
         "platform": sys.platform,
         "is_windows": IS_WINDOWS,
-        "terminal_supported": not IS_WINDOWS,
+        "terminal_supported": (not IS_WINDOWS) or WINPTY_AVAILABLE,
         "python_version": sys.version,
         "comfyui_url": get_comfyui_url_cached()
     })
@@ -722,7 +820,10 @@ def setup_routes(app):
     print("[Claude Code] Memory stats endpoint registered at /claude-code/memory")
     print("[Claude Code] Platform info endpoint registered at /claude-code/platform")
     if IS_WINDOWS:
-        print("[Claude Code] Note: Terminal functionality disabled on Windows")
+        if WINPTY_AVAILABLE:
+            print("[Claude Code] Windows terminal enabled via pywinpty (ConPTY)")
+        else:
+            print("[Claude Code] Terminal disabled: pip install pywinpty to enable it on Windows")
 
 
 def write_comfyui_url():
@@ -807,15 +908,16 @@ try:
     # Write ComfyUI URL for MCP server
     write_comfyui_url()
 
-    # Set up MCP configuration (skip on Windows if claude not found)
-    if not IS_WINDOWS:
-        setup_mcp_config()
-    else:
-        print("[Claude Code] Skipping MCP auto-config on Windows (use Clawdbot instead)")
+    # Set up MCP configuration (no-ops if claude isn't found yet; retried when
+    # the terminal opens). Works on Windows too - the MCP server is pure stdlib.
+    setup_mcp_config()
 
     # Log initial memory usage
     mem_mb = get_memory_mb()
-    platform_note = " (Windows - terminal disabled)" if IS_WINDOWS else ""
+    if IS_WINDOWS:
+        platform_note = " (Windows - ConPTY terminal)" if WINPTY_AVAILABLE else " (Windows - terminal disabled, install pywinpty)"
+    else:
+        platform_note = ""
     print(f"[Claude Code] Plugin loaded successfully{platform_note} (Memory: {mem_mb:.1f}MB)")
 except Exception as e:
     print(f"[Claude Code] Failed to register routes: {e}")
